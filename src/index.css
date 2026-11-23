@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
+
+  /* Palet 1 (#4472d0) menjadi skala biru utama; kelas sky-* dan blue-* mengikutinya. */
+  --color-sky-50: #f1f5fd;
+  --color-sky-100: #e1eaf9;
+  --color-sky-200: #c7d6f3;
+  --color-sky-300: #a0bbea;
+  --color-sky-400: #7398dd;
+  --color-sky-500: #5a83d6;
+  --color-sky-600: #4472d0;
+  --color-sky-700: #3760bb;
+  --color-sky-800: #304f96;
+  --color-sky-900: #2b4377;
+  --color-sky-950: #1c2a4a;
+  --color-blue-50: #f1f5fd;
+  --color-blue-100: #e1eaf9;
+  --color-blue-200: #c7d6f3;
+  --color-blue-300: #a0bbea;
+  --color-blue-400: #7398dd;
+  --color-blue-500: #5a83d6;
+  --color-blue-600: #4472d0;
+  --color-blue-700: #3760bb;
+  --color-blue-800: #304f96;
+  --color-blue-900: #2b4377;
+  --color-blue-950: #1c2a4a;
+
+  --color-brand: #4472d0; /* palet 1: warna utama */
+  --color-brand-dark: #3760bb;
+  --color-accent: #0ea5e9; /* palet 2: aksen */
+  --color-accent-light: #7dd3fc;
+  --color-surface: #f4f7fb; /* palet 3: latar kartu */
+  --color-surface-strong: #e8eef7; /* kepala tabel di dalam kartu */
+  --color-ink: #0f172a; /* palet 4: teks */
+  --color-benhur: #002462; /* biru benhur: warna panel */
+  --color-deep: #0a3a8a; /* ujung gradasi panel benhur */
+  --color-accent-soft: #c9eeff; /* teks sorotan di atas panel biru */
+
+  --animate-fade-up: fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-page-in: page-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-ken-burns: ken-burns 28s ease-in-out infinite alternate;
+  --animate-float: float 16s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  }
+  @keyframes page-in {
+    from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  }
+  @keyframes ken-burns {
+    from { transform: scale(1.04); }
+    to { transform: scale(1.12) translate3d(-1.5%, -1%, 0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(24px, -18px, 0) scale(1.06); }
+  }
+}
+body { font-family: var(--font-sans); background: #ffffff; color: var(--color-ink); }
+
+/*
+ * Reveal saat di-scroll (lihat src/Reveal.tsx). Memakai animasi, bukan transisi,
+ * agar tidak bentrok dengan efek hover/transisi milik kartu. Pengguna dengan
+ * prefers-reduced-motion langsung melihat konten tanpa animasi.
+ */
+@keyframes reveal-up {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal:not(.is-in),
+  .reveal-stagger:not(.is-in) > * { opacity: 0; }
+  .reveal.is-in {
+    animation: reveal-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal-stagger.is-in > * {
+    animation: reveal-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: calc(var(--reveal-delay, 0ms) + var(--i, 0) * 70ms);
+  }
+  .reveal-stagger > :nth-child(2) { --i: 1; }
+  .reveal-stagger > :nth-child(3) { --i: 2; }
+  .reveal-stagger > :nth-child(4) { --i: 3; }
+  .reveal-stagger > :nth-child(5) { --i: 4; }
+  .reveal-stagger > :nth-child(6) { --i: 5; }
+  .reveal-stagger > :nth-child(7) { --i: 6; }
+  .reveal-stagger > :nth-child(n + 8) { --i: 7; }
+}

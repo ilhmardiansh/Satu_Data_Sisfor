@@ -1,9 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+    --animate-fade-up: fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    --animate-page-in: page-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    --animate-ken-burns: ken-burns 28s ease-in-out infinite alternate;
+    --animate-float: float 16s ease-in-out infinite;
+
+    @keyframes fade-up {
+        from { opacity: 0; transform: translate3d(0, 18px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+    @keyframes page-in {
+        from { opacity: 0; transform: translate3d(0, 8px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+    @keyframes ken-burns {
+        from { transform: scale(1.04); }
+        to { transform: scale(1.12) translate3d(-1.5%, -1%, 0); }
+    }
+    @keyframes float {
+        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+        50% { transform: translate3d(24px, -18px, 0) scale(1.06); }
+    }
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: #f5f8fc;
+    color: #0f172a;
+}
+
+@keyframes reveal-up {
+    from { opacity: 0; transform: translate3d(0, 18px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .reveal:not(.is-in),
+    .reveal-stagger:not(.is-in) > * { opacity: 0; }
+    .reveal.is-in {
+        animation: reveal-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        animation-delay: var(--reveal-delay, 0ms);
+    }
+    .reveal-stagger.is-in > * {
+        animation: reveal-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        animation-delay: calc(var(--reveal-delay, 0ms) + var(--i, 0) * 70ms);
+    }
+    .reveal-stagger > :nth-child(2) { --i: 1; }
+    .reveal-stagger > :nth-child(3) { --i: 2; }
+    .reveal-stagger > :nth-child(4) { --i: 3; }
+    .reveal-stagger > :nth-child(5) { --i: 4; }
+    .reveal-stagger > :nth-child(6) { --i: 5; }
+    .reveal-stagger > :nth-child(7) { --i: 6; }
+    .reveal-stagger > :nth-child(n + 8) { --i: 7; }
 }
