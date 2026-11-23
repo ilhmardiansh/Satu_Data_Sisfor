@@ -2,58 +2,73 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\View\View;
 
 class AuthController extends Controller
 {
-    public function showLoginForm()
+    public function showLoginForm(): View|RedirectResponse
     {
+        if (Auth::check()) {
+            return redirect()->route('panel.ringkasan');
+        }
+
         $demoUsers = [
-            ['username' => 'admin', 'password' => 'admin123', 'role' => 'Administrator Prodi', 'color' => 'red'],
-            ['username' => 'walidata', 'password' => 'wali123', 'role' => 'Wali Data Prodi', 'color' => 'indigo'],
-            ['username' => '1462200031', 'password' => 'mhs123', 'role' => 'Produsen (Mahasiswa)', 'color' => 'sky'],
-            ['username' => '0712048601', 'password' => 'dosen123', 'role' => 'Produsen (Dosen)', 'color' => 'emerald'],
+            ['nim' => 'admin', 'password' => 'admin123', 'label' => 'Admin'],
+            ['nim' => 'walidata', 'password' => 'wali123', 'label' => 'Wali Data'],
+            ['nim' => '1462200031', 'password' => 'mhs123', 'label' => 'Produsen · Mahasiswa'],
+            ['nim' => '0712048601', 'password' => 'dosen123', 'label' => 'Produsen · Dosen'],
         ];
 
         return view('pages.login', compact('demoUsers'));
     }
 
-    public function login(Request $request)
+    public function login(Request $request): RedirectResponse
     {
-        $request->validate([
-            'username' => 'required',
-            'password' => 'required',
+        $nimInput = trim((string) ($request->input('nim') ?? $request->input('username') ?? ''));
+        $request->merge(['nim' => $nimInput]);
+
+        $validated = $request->validate([
+            'nim' => ['required', 'string'],
+            'password' => ['required', 'string'],
+        ], [
+            'nim.required' => 'NIM/NIP wajib diisi.',
+            'password.required' => 'Password wajib diisi.',
         ]);
 
-        $users = [
-            'admin' => ['password' => 'admin123', 'name' => 'Administrator Prodi', 'role' => 'admin'],
-            'walidata' => ['password' => 'wali123', 'name' => 'Rina Wulandari, M.Kom', 'role' => 'wali'],
-            '1462200031' => ['password' => 'mhs123', 'name' => 'Nabila Putri', 'role' => 'produsen', 'jenis' => 'Mahasiswa'],
-            '0712048601' => ['password' => 'dosen123', 'name' => 'Dr. Andi Setiawan, M.Kom', 'role' => 'produsen', 'jenis' => 'Dosen'],
-        ];
+        $user = User::query()->where('nim', $validated['nim'])->first();
 
-        $username = trim($request->input('username'));
-        $password = $request->input('password');
-
-        if (isset($users[$username]) && $users[$username]['password'] === $password) {
-            session([
-                'user' => [
-                    'username' => $username,
-                    'name' => $users[$username]['name'],
-                    'role' => $users[$username]['role'],
-                    'jenis' => $users[$username]['jenis'] ?? null,
-                ]
-            ]);
-
-            return redirect()->route('dashboard')->with('success', 'Selamat datang kembali, ' . $users[$username]['name'] . '!');
+        if (! $user || ! Hash::check($validated['password'], $user->password)) {
+            return back()
+                ->withInput(['nim' => $validated['nim']])
+                ->with('error', 'NIM/NIP atau password salah.');
         }
 
-        return back()->withInput()->with('error', 'NIM/NIP atau kata sandi yang Anda masukkan salah.');
+        if (! $user->aktif) {
+            return back()
+                ->withInput(['nim' => $validated['nim']])
+                ->with('error', 'Akun Anda dinonaktifkan. Hubungi Admin prodi.');
+        }
+
+        Auth::login($user);
+        $request->session()->regenerate();
+        $request->session()->put('last_activity_at', now()->timestamp);
+
+        return redirect()->intended(route('panel.ringkasan'))
+            ->with('success', 'Selamat datang kembali, '.$user->name.'!');
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request): RedirectResponse
     {
-        $request->session()->forget('user');
-        return redirect()->route('beranda')->with('success', 'Anda telah berhasil keluar.');
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('login')
+            ->with('success', 'Anda telah berhasil keluar.');
     }
 }

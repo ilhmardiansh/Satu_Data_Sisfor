@@ -2,89 +2,127 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\SatuDataService;
+use App\Models\Category;
+use App\Models\DashboardMetric;
+use App\Models\Visualization;
+use App\Services\ChartPaletteService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): View
     {
-        $metrics = SatuDataService::getMetrics();
-        $allDatasets = SatuDataService::getDatasets();
-        $categories = SatuDataService::getCategories();
+        $user = Auth::user();
+        $privileged = $user && $user->isStaff();
 
-        $selectedYear = (string) $request->query('tahun', 'all');
-        $selectedCat = (string) $request->query('kategori', 'all');
+        $visualizations = Visualization::query()
+            ->with(['dataset.category'])
+            ->where('show', true)
+            ->orderBy('id')
+            ->get()
+            ->filter(function (Visualization $viz) use ($privileged): bool {
+                $dataset = $viz->dataset;
+                if (! $dataset) {
+                    return false;
+                }
 
-        // Palettes mapping matching src/charts.tsx
-        $palettes = [
-            'sky' => ['#4472d0', '#0ea5e9', '#a0bbea', '#0f172a', '#7dd3fc', '#94a3b8'],
-            'blue' => ['#3760bb', '#7398dd', '#a0bbea', '#1c2a4a', '#c7d6f3', '#94a3b8'],
-            'indigo' => ['#4f46e5', '#818cf8', '#a5b4fc', '#312e81', '#c7d2fe', '#94a3b8'],
-            'cyan' => ['#0891b2', '#22d3ee', '#67e8f9', '#164e63', '#a5f3fc', '#94a3b8'],
-            'teal' => ['#0d9488', '#2dd4bf', '#5eead4', '#134e4a', '#99f6e4', '#94a3b8'],
-            'violet' => ['#7c3aed', '#a78bfa', '#c4b5fd', '#4c1d95', '#ddd6fe', '#94a3b8'],
-        ];
+                return $privileged || $dataset->access === 'public';
+            })
+            ->values();
 
-        // Process visualizations and attach dataset details
         $vizList = [];
         $years = [];
         $usedCategoryCodes = [];
 
-        foreach ($metrics['visualizations'] as $v) {
-            $dataset = collect($allDatasets)->firstWhere('id', $v['datasetId']);
-            if (!$dataset) continue;
-
-            $years[] = $dataset['tahun'];
-            $usedCategoryCodes[] = $dataset['kategori'];
-
-            // Find numeric columns excluding labelCol
-            $numericCols = [];
-            foreach ($dataset['cols'] as $i => $colName) {
-                if ($i === $v['labelCol']) continue;
-                $isNum = true;
-                foreach ($dataset['rows'] as $r) {
-                    $val = str_replace(['Rp', ' ', '%', '.'], '', (string) ($r[$i] ?? ''));
-                    $val = str_replace(',', '.', $val);
-                    if (!is_numeric($val)) {
-                        $isNum = false;
-                        break;
-                    }
-                }
-                if ($isNum) {
-                    $numericCols[$i] = $colName;
-                }
+        foreach ($visualizations as $viz) {
+            $dataset = $viz->dataset;
+            if (! $dataset) {
+                continue;
             }
 
-            $v['dataset'] = $dataset;
-            $v['numericCols'] = $numericCols;
-            $v['palette'] = $palettes[$v['color']] ?? $palettes['sky'];
-            $vizList[] = $v;
+            $cols = $dataset->cols ?? [];
+            $rows = $dataset->rows ?? [];
+            $numericMap = ChartPaletteService::numericColumns($cols, $rows);
+            unset($numericMap[$viz->label_col]);
+
+            $years[] = $dataset->tahun;
+            if ($dataset->category) {
+                $usedCategoryCodes[] = $dataset->category->code;
+            }
+
+            $vizList[] = [
+                'id' => $viz->code,
+                'title' => $viz->title,
+                'datasetId' => $dataset->code,
+                'datasetTitle' => $dataset->title,
+                'tahun' => $dataset->tahun,
+                'kategori' => $dataset->category?->code ?? '',
+                'kategoriName' => $dataset->category?->name ?? '',
+                'labelCol' => $viz->label_col,
+                'valueCol' => $viz->value_col,
+                'kind' => $viz->kind,
+                'color' => $viz->color,
+                'palette' => ChartPaletteService::palette($viz->color),
+                'cols' => $cols,
+                'rows' => $rows,
+                'numericCols' => $numericMap,
+            ];
         }
 
         $years = array_values(array_unique($years));
         rsort($years);
 
-        $cats = array_values(array_filter($categories, function ($c) use ($usedCategoryCodes) {
-            return in_array($c['code'], $usedCategoryCodes);
-        }));
+        $usedCategoryCodes = array_values(array_unique($usedCategoryCodes));
+        $cats = Category::query()
+            ->whereIn('code', $usedCategoryCodes)
+            ->orderBy('id')
+            ->get(['code', 'name'])
+            ->toArray();
 
-        // Filter vizList if selectedYear != 'all' or selectedCat != 'all'
-        $filteredViz = array_filter($vizList, function ($v) use ($selectedYear, $selectedCat) {
-            $matchYr = ($selectedYear === 'all' || (string) $v['dataset']['tahun'] === $selectedYear);
-            $matchCat = ($selectedCat === 'all' || (string) $v['dataset']['kategori'] === $selectedCat);
-            return $matchYr && $matchCat;
-        });
+        $selectedYear = (string) $request->query('tahun', 'all');
+        $selectedCat = (string) $request->query('kategori', 'all');
+
+        $groupedMetrics = DashboardMetric::query()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('section');
+
+        $formatMetric = static function (DashboardMetric $metric): array {
+            return [
+                'id' => $metric->id,
+                'title' => $metric->title,
+                'color' => $metric->color,
+                'palette' => ChartPaletteService::palette($metric->color),
+                'total' => $metric->total,
+                'unit' => $metric->unit,
+                'def' => $metric->default_kind,
+                'trend' => $metric->trend_value ? [
+                    'v' => $metric->trend_value,
+                    'up' => (bool) $metric->trend_up,
+                ] : null,
+                'data' => $metric->data ?? [],
+                'foot' => $metric->foot,
+                'table' => $metric->table_data ?? [],
+            ];
+        };
+
+        $metrics = [
+            'akademik1' => $groupedMetrics->get('akademik1', collect())->map($formatMetric)->values()->all(),
+            'akademik2' => $groupedMetrics->get('akademik2', collect())->map($formatMetric)->values()->all(),
+            'nonakademik1' => $groupedMetrics->get('nonakademik1', collect())->map($formatMetric)->values()->all(),
+            'nonakademik2' => $groupedMetrics->get('nonakademik2', collect())->map($formatMetric)->values()->all(),
+        ];
 
         return view('pages.dashboard', compact(
             'metrics',
-            'filteredViz',
             'vizList',
             'years',
             'cats',
             'selectedYear',
-            'selectedCat',
-            'palettes'
+            'selectedCat'
         ));
     }
 }

@@ -2,42 +2,43 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\SatuDataService;
-use Illuminate\Http\Request;
+use App\Models\Achievement;
+use App\Models\Course;
+use App\Models\Lecturer;
+use App\Models\NewsArticle;
+use App\Models\ProgramProfile;
+use Illuminate\View\View;
 
 class BerandaController extends Controller
 {
-    public function index()
+    public function index(): View
     {
-        $profil = SatuDataService::getProfil();
-        $categories = SatuDataService::getCategories();
-        $allDatasets = SatuDataService::getDatasets();
-        $dosen = SatuDataService::getDosen();
-        $prestasi = SatuDataService::getPrestasi();
-        $kurikulum = SatuDataService::getKurikulum();
-        $berita = SatuDataService::getNews();
-        $metrics = SatuDataService::getMetrics();
-
-        // Attach dataset count to categories
-        foreach ($categories as &$cat) {
-            $cat['count'] = count(array_filter($allDatasets, fn($d) => $d['kategori'] === $cat['code']));
-        }
-        unset($cat);
-
-        $datasetsCount = count($allDatasets);
-        $dashboardsCount = count($metrics['visualizations']) + 12;
-        $categoriesCount = count($categories);
+        $profil = ProgramProfile::query()->first();
+        $berita = NewsArticle::query()
+            ->orderByDesc('created_at')
+            ->orderBy('id')
+            ->limit(3)
+            ->get();
+        $prestasi = Achievement::query()
+            ->orderByDesc('tahun')
+            ->orderBy('id')
+            ->get();
+        $dosen = Lecturer::query()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+        $kurikulum = Course::query()
+            ->orderByDesc('tahun')
+            ->orderBy('semester')
+            ->orderBy('kode')
+            ->get();
 
         return view('pages.beranda', compact(
             'profil',
-            'categories',
-            'datasetsCount',
-            'dashboardsCount',
-            'categoriesCount',
-            'dosen',
+            'berita',
             'prestasi',
-            'kurikulum',
-            'berita'
+            'dosen',
+            'kurikulum'
         ));
     }
 }

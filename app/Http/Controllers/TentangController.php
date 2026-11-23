@@ -2,18 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\SatuDataService;
-use Illuminate\Http\Request;
+use App\Models\ProgramProfile;
+use Illuminate\View\View;
 
 class TentangController extends Controller
 {
-    public function index()
+    public function index(): View
     {
-        $profil = SatuDataService::getProfil();
-        $dosen = SatuDataService::getDosen();
-        $prestasi = SatuDataService::getPrestasi();
-        $kurikulum = SatuDataService::getKurikulum();
+        $profil = ProgramProfile::query()->first();
 
-        return view('pages.tentang-kami', compact('profil', 'dosen', 'prestasi', 'kurikulum'));
+        return view('pages.tentang-kami', compact('profil'));
     }
 }
