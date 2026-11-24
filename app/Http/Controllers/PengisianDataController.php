@@ -13,48 +13,49 @@ class PengisianDataController extends Controller
     public function index(Request $request): View
     {
         $user = Auth::user();
-        $activeForms = DataForm::query()
-            ->with('category')
-            ->where('deadline', '>', now())
-            ->orderBy('deadline')
+        $activeForms = DataForm::open()
+            ->with(['category', 'kolomFormulir'])
+            ->orderBy('tanggal_waktu')
             ->get();
 
         $myCounts = [];
         if ($user) {
             $myCounts = FormSubmission::query()
-                ->where('user_id', $user->id)
-                ->selectRaw('data_form_id, COUNT(*) as total')
-                ->groupBy('data_form_id')
-                ->pluck('total', 'data_form_id')
+                ->where('diisi_oleh', $user->id)
+                ->selectRaw('id_formulir, COUNT(*) as total')
+                ->groupBy('id_formulir')
+                ->pluck('total', 'id_formulir')
                 ->all();
         }
 
         $formsPayload = $activeForms->map(function (DataForm $form) use ($user, $myCounts): array {
-            $eligible = $user && $user->isProdusen() && $form->canBeSeenBy($user);
+            $eligible = $user && ($user->isProdusen() || $user->isAdmin()) && $form->canBeSeenBy($user);
 
             return [
                 'id' => $form->id,
                 'code' => $form->code,
-                'title' => $form->title,
-                'desc' => $form->description ?? '',
+                'title' => $form->judul,
+                'desc' => $form->deskripsi ?? '',
                 'kategori' => $form->category?->code ?? '',
-                'categoryName' => $form->category?->name ?? '',
+                'categoryName' => $form->category?->nama_kategori ?? '',
                 'tahun' => $form->tahun,
                 'periode' => $form->periode,
                 'target' => $form->target,
-                'deadline' => $form->deadline?->toIso8601String() ?? '',
+                'batasiSatuRespon' => (bool) $form->batasi_satu_respon,
+                'deadline' => $form->tanggal_waktu?->toIso8601String() ?? '',
                 'deadlineFormatted' => $form->deadlineFormatted(),
                 'timeLeft' => $form->timeLeftLabel(),
                 'urgent' => $form->isUrgent(),
                 'fields' => $form->fields ?? [],
                 'mine' => (int) ($myCounts[$form->id] ?? 0),
                 'eligible' => $eligible,
+                'formUrl' => route('formulir.show', $form->code),
                 'submitUrl' => route('panel.isi.submit', $form->code),
             ];
         })->values()->all();
 
         $activeCount = $activeForms->count();
-        $categoriesCount = $activeForms->pluck('category_id')->unique()->count();
+        $categoriesCount = $activeForms->pluck('id_kategori')->unique()->count();
         $mhsCount = $activeForms->where('target', 'Mahasiswa')->count();
 
         $target = (string) $request->query('target', 'Semua');

@@ -24,20 +24,20 @@ class DatasetController extends Controller
         $sessionRequestCodes = (array) $request->session()->get('my_request_codes', []);
 
         $categories = Category::query()
-            ->withCount('datasets')
+            ->withCount(['datasets' => fn ($q) => $q->where('status_publikasi', 'terpublikasi')])
             ->orderBy('id')
             ->get()
             ->map(fn (Category $cat): array => [
                 'code' => $cat->code,
-                'name' => $cat->name,
-                'desc' => $cat->description,
+                'name' => $cat->nama_kategori,
+                'desc' => $cat->deskripsi,
                 'count' => $cat->datasets_count,
             ])
             ->values()
             ->all();
 
-        $datasetsCollection = Dataset::query()
-            ->with('category')
+        $datasetsCollection = Dataset::published()
+            ->with(['category', 'sourceForm'])
             ->orderByDesc('tahun')
             ->orderBy('id')
             ->get();
@@ -45,7 +45,7 @@ class DatasetController extends Controller
         $requestsQuery = DataRequest::query()->with('dataset');
         $requestsQuery->where(function ($query) use ($user, $requesterToken, $sessionRequestCodes): void {
             if ($user) {
-                $query->orWhere('user_id', $user->id);
+                $query->orWhere('diajukan_oleh', $user->id);
             }
             if ($requesterToken !== '') {
                 $query->orWhere('session_token', $requesterToken);
@@ -56,17 +56,17 @@ class DatasetController extends Controller
         });
 
         $requests = ($user || $requesterToken !== '' || ! empty($sessionRequestCodes))
-            ? $requestsQuery->orderByDesc('requested_at')->get()
+            ? $requestsQuery->orderByDesc('waktu_pengajuan')->get()
             : collect();
 
         $myRequests = $requests->map(fn (DataRequest $req): array => [
             'id' => $req->code,
             'datasetId' => $req->dataset?->code ?? '',
-            'nama' => $req->nama,
-            'email' => $req->email,
+            'nama' => $req->nama_pemohon,
+            'email' => $req->email_pemohon,
             'status' => $req->status,
-            'note' => $req->note,
-            'at' => $req->requested_at?->toIso8601String() ?? '',
+            'note' => $req->catatan_konfirmasi,
+            'at' => $req->waktu_pengajuan?->toIso8601String() ?? '',
         ])->values()->all();
 
         $allDatasets = $datasetsCollection->map(function (Dataset $d) use ($user, $requesterToken, $sessionRequestCodes): array {
@@ -77,14 +77,18 @@ class DatasetController extends Controller
                 'tahun' => $d->tahun,
                 'periode' => $d->periode,
                 'kategori' => $d->category?->code ?? '',
-                'access' => $d->access,
+                'access' => $d->tipe_akses,
                 'accessible' => $accessible,
-                'title' => $d->title,
-                'desc' => $d->description ?? '',
-                'updated' => $d->updated_label ?? ($d->updated_at?->locale('id')->translatedFormat('j M Y') ?? ''),
+                'title' => $d->judul,
+                'desc' => $d->deskripsi ?? '',
+                'updated' => $d->label_diperbarui ?? ($d->updated_at?->locale('id')->translatedFormat('j M Y') ?? ''),
                 'format' => $d->format,
-                'cols' => $d->cols ?? [],
-                'rowCount' => count($d->rows ?? []),
+                'cols' => $d->kolom ?? [],
+                'rowCount' => count($d->baris ?? []),
+                'sourceFormCode' => $d->sourceForm?->code,
+                'sourceFormTitle' => $d->sourceForm?->judul,
+                'buildMode' => $d->konfigurasi_sumber['mode'] ?? null,
+                'preprocessingAt' => $d->sourceForm?->waktu_diproses?->locale('id')->translatedFormat('j M Y'),
                 'previewUrl' => route('dataset.preview', $d->code),
                 'csvUrl' => route('dataset.download', [$d->code, 'csv']),
                 'xlsxUrl' => route('dataset.download', [$d->code, 'xlsx']),
@@ -135,14 +139,14 @@ class DatasetController extends Controller
 
         return response()->json([
             'id' => $dataset->code,
-            'title' => $dataset->title,
-            'desc' => $dataset->description ?? '',
-            'category' => $dataset->category?->name ?? '',
-            'access' => $dataset->access,
-            'updated' => $dataset->updated_label ?? ($dataset->updated_at?->locale('id')->translatedFormat('j M Y') ?? ''),
+            'title' => $dataset->judul,
+            'desc' => $dataset->deskripsi ?? '',
+            'category' => $dataset->category?->nama_kategori ?? '',
+            'access' => $dataset->tipe_akses,
+            'updated' => $dataset->label_diperbarui ?? ($dataset->updated_at?->locale('id')->translatedFormat('j M Y') ?? ''),
             'format' => $dataset->format,
-            'cols' => $dataset->cols ?? [],
-            'rows' => $dataset->rows ?? [],
+            'cols' => $dataset->kolom ?? [],
+            'rows' => $dataset->baris ?? [],
             'csvUrl' => route('dataset.download', [$dataset->code, 'csv']),
             'xlsxUrl' => route('dataset.download', [$dataset->code, 'xlsx']),
         ]);
@@ -164,11 +168,11 @@ class DatasetController extends Controller
 
         $fmt = strtolower($format);
         if ($fmt === 'csv') {
-            return $exporter->downloadCsv($dataset->title, $dataset->cols ?? [], $dataset->rows ?? []);
+            return $exporter->downloadCsv($dataset->judul, $dataset->kolom ?? [], $dataset->baris ?? []);
         }
 
         if ($fmt === 'xlsx') {
-            return $exporter->downloadXlsx($dataset->title, $dataset->cols ?? [], $dataset->rows ?? []);
+            return $exporter->downloadXlsx($dataset->judul, $dataset->kolom ?? [], $dataset->baris ?? []);
         }
 
         abort(404);
@@ -176,6 +180,10 @@ class DatasetController extends Controller
 
     public function storeRequest(Request $request, Dataset $dataset): JsonResponse|RedirectResponse
     {
+        if (! $dataset->isPublished()) {
+            abort(403, 'Dataset ini masih berstatus draft.');
+        }
+
         $validated = $request->validate([
             'nama' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:150'],
@@ -195,21 +203,21 @@ class DatasetController extends Controller
         ]);
 
         $requesterToken = $this->requesterToken($request);
-        $code = CodeGenerator::next('R', 'data_requests');
+        $code = CodeGenerator::next('R', 'permohonan_data');
 
         $dataRequest = DataRequest::create([
             'code' => $code,
-            'dataset_id' => $dataset->id,
-            'user_id' => Auth::id(),
+            'id_dataset' => $dataset->id,
+            'diajukan_oleh' => Auth::id(),
             'session_token' => $requesterToken !== '' ? $requesterToken : null,
-            'nama' => trim($validated['nama']),
-            'email' => trim($validated['email']),
-            'hp' => trim($validated['hp']),
-            'nim' => trim($validated['nim']),
+            'nama_pemohon' => trim($validated['nama']),
+            'email_pemohon' => trim($validated['email']),
+            'hp_pemohon' => trim($validated['hp']),
+            'nim_pemohon' => trim($validated['nim']),
             'tujuan' => trim($validated['tujuan']),
-            'deskripsi' => trim($validated['deskripsi']),
+            'alasan' => trim($validated['deskripsi']),
             'status' => 'menunggu',
-            'requested_at' => now(),
+            'waktu_pengajuan' => now(),
         ]);
 
         $codes = (array) $request->session()->get('my_request_codes', []);
@@ -222,11 +230,11 @@ class DatasetController extends Controller
                 'request' => [
                     'id' => $dataRequest->code,
                     'datasetId' => $dataset->code,
-                    'nama' => $dataRequest->nama,
-                    'email' => $dataRequest->email,
+                    'nama' => $dataRequest->nama_pemohon,
+                    'email' => $dataRequest->email_pemohon,
                     'status' => $dataRequest->status,
-                    'note' => $dataRequest->note,
-                    'at' => $dataRequest->requested_at?->toIso8601String() ?? '',
+                    'note' => $dataRequest->catatan_konfirmasi,
+                    'at' => $dataRequest->waktu_pengajuan?->toIso8601String() ?? '',
                 ],
             ], 201);
         }

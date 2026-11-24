@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\DataForm;
 use App\Models\DataRequest;
 use App\Models\ProgramProfile;
 use Illuminate\Support\Facades\Auth;
@@ -31,17 +32,26 @@ class AppServiceProvider extends ServiceProvider
 
             $siteProfil = null;
             $pendingRequestsCount = 0;
+            $formsNeedingPreprocessingCount = 0;
 
             try {
-                if (Schema::hasTable('program_profiles')) {
+                if (Schema::hasTable('profil_prodi')) {
                     $siteProfil = ProgramProfile::query()->first();
                 }
 
                 $user = Auth::user();
-                if ($user && $user->isStaff() && Schema::hasTable('data_requests')) {
-                    $pendingRequestsCount = DataRequest::query()
-                        ->where('status', 'menunggu')
-                        ->count();
+                if ($user && $user->isStaff()) {
+                    if (Schema::hasTable('permohonan_data')) {
+                        $pendingRequestsCount = DataRequest::query()
+                            ->where('status', 'menunggu')
+                            ->count();
+                    }
+
+                    if (Schema::hasTable('formulir')) {
+                        $formsNeedingPreprocessingCount = DataForm::query()
+                            ->where('status_preprocessing', 'proses')
+                            ->count();
+                    }
                 }
             } catch (Throwable) {
                 // Database may not be migrated yet during CLI bootstrap.
@@ -52,6 +62,7 @@ class AppServiceProvider extends ServiceProvider
                 't' => $t,
                 'siteProfil' => $siteProfil,
                 'pendingRequestsCount' => $pendingRequestsCount,
+                'formsNeedingPreprocessingCount' => $formsNeedingPreprocessingCount,
             ]);
         });
     }

@@ -557,6 +557,7 @@ export function mountThreeScene(el, variant = 'orbit') {
 
     let frame = 0;
     let visible = true;
+    let userPaused = window.__sdMotionPaused === true;
     let lastTime = 0;
 
     const tick = (now) => {
@@ -568,7 +569,7 @@ export function mountThreeScene(el, variant = 'orbit') {
     };
 
     const start = () => {
-        if (reduced || frame || !visible || document.hidden) return;
+        if (reduced || userPaused || frame || !visible || document.hidden) return;
         lastTime = performance.now();
         frame = requestAnimationFrame(tick);
     };
@@ -577,6 +578,17 @@ export function mountThreeScene(el, variant = 'orbit') {
         cancelAnimationFrame(frame);
         frame = 0;
     };
+
+    const onMotionToggle = (e) => {
+        userPaused = Boolean(e?.detail?.paused ?? window.__sdMotionPaused);
+        if (userPaused) {
+            stop();
+            render();
+        } else {
+            start();
+        }
+    };
+    window.addEventListener('sd:motion-toggle', onMotionToggle);
 
     const resize = () => {
         const w = Math.max(1, el.clientWidth);
@@ -613,6 +625,7 @@ export function mountThreeScene(el, variant = 'orbit') {
         sizeObserver.disconnect();
         viewObserver.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
+        window.removeEventListener('sd:motion-toggle', onMotionToggle);
         window.removeEventListener('pointermove', onPointer);
         disposables.forEach((d) => d.dispose?.());
         renderer.dispose();

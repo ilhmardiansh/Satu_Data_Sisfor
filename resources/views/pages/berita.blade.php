@@ -15,10 +15,10 @@
              class="pointer-events-none absolute -top-4 right-0 hidden h-36 w-80 opacity-75 lg:block"
              style="mask-image: radial-gradient(closest-side, #000 58%, transparent 98%); -webkit-mask-image: radial-gradient(closest-side, #000 58%, transparent 98%);"></div>
         <div class="relative z-10">
-            <p class="text-sm text-slate-400">
-                <a href="{{ route('beranda') }}" class="transition hover:text-sky-600">{{ $t('Beranda', 'Home') }}</a>
+            <p class="text-sm text-slate-600">
+                <a href="{{ route('beranda') }}" class="transition hover:text-[#0069A8]">{{ $t('Beranda', 'Home') }}</a>
                 <span class="mx-1">/</span>
-                <span class="text-sky-600">{{ $t('Berita', 'News') }}</span>
+                <span class="font-medium text-[#0069A8]">{{ $t('Berita', 'News') }}</span>
             </p>
 
             <div class="mt-1 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
@@ -47,12 +47,12 @@
         </div>
     </div>
 
-    <div class="mt-6 flex gap-2 overflow-x-auto border-b border-slate-200/80 pb-4">
+    <div class="mt-6 flex gap-2 overflow-x-auto border-b border-slate-200 pb-4">
         @foreach($tags as $tag)
             <a
                 href="{{ route('berita', array_filter(['tag' => $tag === 'Semua' ? null : $tag, 'q' => $q ?: null])) }}"
                 aria-pressed="{{ $selectedTag === $tag ? 'true' : 'false' }}"
-                class="shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition motion-safe:active:scale-[0.97] {{ $selectedTag === $tag ? 'bg-gradient-to-b from-brand to-brand-dark text-white shadow-xs' : 'bg-white text-slate-600 ring-1 ring-slate-200/90 hover:ring-slate-300 hover:text-slate-900' }}"
+                class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors {{ $selectedTag === $tag ? 'bg-[#0069A8] text-white' : 'bg-[#F6F9FC] text-[#45556C] hover:bg-slate-200/70 hover:text-slate-900' }}"
             >
                 {{ $tag }}
             </a>
@@ -60,75 +60,76 @@
     </div>
 
     @if(! $lead)
-        <p class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white py-12 text-center text-sm text-slate-500">
-            Tidak ada berita yang cocok.
+        <p class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-[#F6F9FC] py-12 text-center text-sm text-[#45556C]">
+            Tidak ada berita yang cocok dengan kata kunci atau kategori yang dipilih.
         </p>
     @else
         <a
             href="{{ route('berita.show', $lead->code) }}"
-            class="sd-card sd-card-hover group mt-8 grid w-full grid-cols-1 overflow-hidden text-left md:grid-cols-[1.3fr_1fr]"
+            class="group mt-8 grid w-full grid-cols-1 items-center gap-6 overflow-hidden rounded-2xl bg-[#F6F9FC] p-4 text-left transition-colors hover:bg-[#F0F9FF]/70 sm:p-6 md:grid-cols-[1.25fr_1fr]"
         >
-            <div class="relative aspect-[16/10] overflow-hidden bg-slate-100">
+            <div class="relative aspect-[16/10] overflow-hidden rounded-xl bg-slate-200">
                 <img
                     src="{{ $lead->image_url }}"
                     alt="{{ $lead->title }}"
-                    class="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                 />
             </div>
-            <div class="flex min-w-0 flex-col justify-center p-6 sm:p-8">
-                <span class="w-fit rounded-lg bg-brand px-2.5 py-1 text-[11px] font-bold text-white shadow-2xs">
+            <div class="flex min-w-0 flex-col justify-center sm:px-2">
+                <span class="w-fit rounded-lg bg-[#0069A8] px-2.5 py-1 text-[11px] font-bold text-white">
                     {{ $lead->badge }}
                 </span>
-                <h2 class="mt-4 text-2xl leading-snug font-extrabold tracking-tight text-slate-900 transition-colors group-hover:text-brand">
+                <h2 class="mt-4 text-2xl leading-snug font-extrabold tracking-tight text-slate-900 transition-colors group-hover:text-[#0069A8]">
                     {{ $lead->title }}
                 </h2>
-                <p class="mt-3 leading-relaxed text-slate-500">{{ $lead->excerpt }}</p>
+                <p class="mt-3 leading-relaxed text-[#45556C]">{{ $lead->excerpt }}</p>
                 <div class="mt-6 flex items-center justify-between">
-                    <div class="flex items-center gap-3 text-xs font-medium text-slate-500">
+                    <div class="flex items-center gap-3 text-xs font-medium text-[#62748E]">
                         <span>{{ $lead->date_label }}</span>
                         <span class="h-1 w-1 rounded-full bg-slate-300"></span>
                         <span>{{ $lead->read_minutes }} menit baca</span>
                     </div>
-                    <span class="text-sm font-bold text-brand">Baca →</span>
+                    <span class="text-sm font-bold text-[#0069A8]">Baca berita</span>
                 </div>
             </div>
         </a>
 
         @if($rest->isNotEmpty())
-            <div class="reveal-stagger mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="reveal-stagger mt-10 grid grid-cols-1 gap-8 border-t border-slate-200/80 pt-10 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach($rest as $n)
                     <a
                         href="{{ route('berita.show', $n->code) }}"
-                        class="sd-card sd-card-hover group flex flex-col overflow-hidden text-left motion-safe:hover:-translate-y-1"
+                        class="group flex flex-col text-left"
                     >
-                        <div class="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
+                        <div class="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-slate-100">
                             <img
                                 src="{{ $n->image_url }}"
                                 alt="{{ $n->title }}"
-                                class="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                loading="lazy"
+                                class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                             />
-                            <span class="absolute top-3 left-3 rounded-lg bg-brand/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-sm">
+                            <span class="absolute top-3 left-3 rounded-lg bg-[#0069A8] px-2.5 py-1 text-[11px] font-bold text-white">
                                 {{ $n->badge }}
                             </span>
                         </div>
-                        <div class="flex flex-1 flex-col p-5">
-                            <div class="flex items-center gap-3 text-xs font-medium text-slate-500">
+                        <div class="mt-4 flex flex-1 flex-col">
+                            <div class="flex items-center gap-3 text-xs font-medium text-[#62748E]">
                                 <span>{{ $n->date_label }}</span>
                                 <span class="h-1 w-1 rounded-full bg-slate-300"></span>
                                 <span>{{ $n->read_minutes }} menit baca</span>
                             </div>
-                            <h3 class="mt-3 line-clamp-3 min-h-[4.1rem] text-[17px] leading-snug font-bold tracking-tight text-slate-900 transition-colors group-hover:text-brand">
+                            <h3 class="mt-2.5 line-clamp-3 text-[17px] leading-snug font-bold tracking-tight text-slate-900 transition-colors group-hover:text-[#0069A8]">
                                 {{ $n->title }}
                             </h3>
-                            <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-500">{{ $n->excerpt }}</p>
-                            <div class="mt-auto flex items-center justify-between pt-5">
-                                <span class="flex items-center gap-2 text-xs font-medium text-slate-600">
-                                    <span class="grid h-7 w-7 place-items-center rounded-full bg-sky-50 text-[10px] font-bold text-brand-dark ring-1 ring-sky-200/70">
+                            <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-[#45556C]">{{ $n->excerpt }}</p>
+                            <div class="mt-auto flex items-center justify-between pt-4">
+                                <span class="flex items-center gap-2 text-xs font-medium text-[#62748E]">
+                                    <span class="grid h-7 w-7 place-items-center rounded-full bg-[#F0F9FF] text-[10px] font-bold text-[#0069A8]">
                                         {{ $n->author_initials }}
                                     </span>
                                     {{ $n->author }}
                                 </span>
-                                <span class="text-sm font-bold text-brand">Baca →</span>
+                                <span class="text-sm font-bold text-[#0069A8]">Baca</span>
                             </div>
                         </div>
                     </a>

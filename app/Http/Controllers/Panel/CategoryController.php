@@ -24,7 +24,7 @@ class CategoryController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:40', 'regex:/^[A-Z0-9-]+$/', 'unique:categories,code'],
+            'code' => ['required', 'string', 'max:40', 'regex:/^[A-Z0-9-]+$/', 'unique:kategori,code'],
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:500'],
         ], [
@@ -36,8 +36,8 @@ class CategoryController extends Controller
 
         Category::create([
             'code' => trim($validated['code']),
-            'name' => trim($validated['name']),
-            'description' => trim((string) ($validated['description'] ?? '')),
+            'nama_kategori' => trim($validated['name']),
+            'deskripsi' => trim((string) ($validated['description'] ?? '')),
         ]);
 
         return redirect()->route('panel.kategori')
@@ -52,7 +52,7 @@ class CategoryController extends Controller
                 'string',
                 'max:40',
                 'regex:/^[A-Z0-9-]+$/',
-                Rule::unique('categories', 'code')->ignore($category->id),
+                Rule::unique('kategori', 'code')->ignore($category->id),
             ],
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:500'],
@@ -65,8 +65,8 @@ class CategoryController extends Controller
 
         $category->update([
             'code' => trim($validated['code']),
-            'name' => trim($validated['name']),
-            'description' => trim((string) ($validated['description'] ?? '')),
+            'nama_kategori' => trim($validated['name']),
+            'deskripsi' => trim((string) ($validated['description'] ?? '')),
         ]);
 
         return redirect()->route('panel.kategori')

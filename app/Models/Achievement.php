@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Achievement extends Model
 {
+    protected $table = 'prestasi';
+
     public const TINGKAT_OPTIONS = [
         'Regional',
         'Nasional',
@@ -15,11 +19,14 @@ class Achievement extends Model
     protected $fillable = [
         'code',
         'judul',
-        'nama',
+        'deskripsi',
+        'tanggal',
+        'jalur_gambar',
+        'nama_peraih',
         'tingkat',
         'peringkat',
         'tahun',
-        'foto',
+        'dikelola_oleh',
     ];
 
     /**
@@ -28,7 +35,23 @@ class Achievement extends Model
     protected function casts(): array
     {
         return [
+            'tanggal' => 'date',
             'tahun' => 'integer',
         ];
+    }
+
+    protected function nama(): Attribute
+    {
+        return Attribute::make(get: fn (): string => (string) $this->nama_peraih);
+    }
+
+    protected function foto(): Attribute
+    {
+        return Attribute::make(get: fn (): ?string => $this->jalur_gambar);
+    }
+
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'dikelola_oleh');
     }
 }

@@ -19,21 +19,21 @@ class UserController extends Controller
         $role = (string) $request->query('role', 'all');
 
         $roleCounts = [
-            'produsen' => User::query()->where('role', 'produsen')->count(),
-            'wali' => User::query()->where('role', 'wali')->count(),
-            'admin' => User::query()->where('role', 'admin')->count(),
+            'produsen' => User::withRole('produsen')->count(),
+            'wali' => User::withRole('wali')->count(),
+            'admin' => User::withRole('admin')->count(),
         ];
 
-        $query = User::query()->orderBy('id');
+        $query = User::query()->with('peran')->orderBy('id');
 
         if (in_array($role, ['produsen', 'wali', 'admin'], true)) {
-            $query->where('role', $role);
+            $query->withRole($role);
         }
 
         if ($q !== '') {
             $like = '%'.strtolower($q).'%';
             $query->where(function ($sub) use ($like): void {
-                $sub->whereRaw('LOWER(name) LIKE ?', [$like])
+                $sub->whereRaw('LOWER(nama_pengguna) LIKE ?', [$like])
                     ->orWhereRaw('LOWER(nim) LIKE ?', [$like]);
             });
         }
@@ -47,7 +47,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'nim' => ['required', 'string', 'max:60', 'unique:users,nim'],
+            'nim' => ['required', 'string', 'max:60', 'unique:pengguna,nim'],
             'role' => ['required', 'in:produsen,wali,admin'],
             'jenis' => ['required_if:role,produsen', 'nullable', 'in:Mahasiswa,Dosen'],
             'password' => ['required', 'string', 'min:6'],
@@ -61,12 +61,12 @@ class UserController extends Controller
         ]);
 
         User::create([
-            'code' => CodeGenerator::next('U', 'users'),
-            'name' => trim($validated['name']),
+            'code' => CodeGenerator::next('U', 'pengguna'),
+            'nama_pengguna' => trim($validated['name']),
             'nim' => trim($validated['nim']),
-            'role' => $validated['role'],
+            'id_peran' => User::resolveRoleId($validated['role']),
             'jenis' => $validated['role'] === 'produsen' ? $validated['jenis'] : null,
-            'password' => Hash::make($validated['password']),
+            'kata_sandi' => Hash::make($validated['password']),
             'aktif' => $request->boolean('aktif'),
         ]);
 
@@ -78,7 +78,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'nim' => ['required', 'string', 'max:60', Rule::unique('users', 'nim')->ignore($user->id)],
+            'nim' => ['required', 'string', 'max:60', Rule::unique('pengguna', 'nim')->ignore($user->id)],
             'role' => ['required', 'in:produsen,wali,admin'],
             'jenis' => ['required_if:role,produsen', 'nullable', 'in:Mahasiswa,Dosen'],
             'password' => ['nullable', 'string', 'min:6'],
@@ -97,15 +97,15 @@ class UserController extends Controller
         }
 
         $payload = [
-            'name' => trim($validated['name']),
+            'nama_pengguna' => trim($validated['name']),
             'nim' => trim($validated['nim']),
-            'role' => $validated['role'],
+            'id_peran' => User::resolveRoleId($validated['role']),
             'jenis' => $validated['role'] === 'produsen' ? $validated['jenis'] : null,
             'aktif' => $aktif,
         ];
 
         if (! empty($validated['password'])) {
-            $payload['password'] = Hash::make($validated['password']);
+            $payload['kata_sandi'] = Hash::make($validated['password']);
         }
 
         $user->update($payload);

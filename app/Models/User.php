@@ -5,17 +5,25 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['code', 'name', 'nim', 'email', 'password', 'role', 'jenis', 'aktif'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['code', 'nama_pengguna', 'nim', 'email', 'kata_sandi', 'id_peran', 'jenis', 'aktif'])]
+#[Hidden(['kata_sandi', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    protected $table = 'pengguna';
+
+    /** @var array<int, string> */
+    protected $with = ['peran.hakAkses'];
 
     public const ROLE_LABELS = [
         'produsen' => 'Produsen Data',
@@ -24,17 +32,85 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
             'aktif' => 'boolean',
         ];
+    }
+
+    public function getAuthPasswordName(): string
+    {
+        return 'kata_sandi';
+    }
+
+    public function getAuthPassword(): string
+    {
+        return (string) $this->kata_sandi;
+    }
+
+    public function peran(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'id_peran');
+    }
+
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => (string) $this->nama_pengguna,
+        );
+    }
+
+    protected function role(): Attribute
+    {
+        return Attribute::make(
+            get: function (): string {
+                $this->loadMissing('peran');
+
+                return (string) ($this->peran?->nama_peran ?? 'produsen');
+            },
+        );
+    }
+
+    protected function password(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => (string) $this->kata_sandi,
+        );
+    }
+
+    /**
+     * Resolve or create a role primary key by nama_peran.
+     */
+    public static function resolveRoleId(string $roleName): int
+    {
+        $role = Role::query()->firstOrCreate(
+            ['nama_peran' => $roleName],
+            ['deskripsi' => self::ROLE_LABELS[$roleName] ?? ucfirst($roleName)]
+        );
+
+        return (int) $role->id;
+    }
+
+    public function scopeWithRole(Builder $query, string $roleName): Builder
+    {
+        return $query->whereHas('peran', function (Builder $sub) use ($roleName): void {
+            $sub->where('nama_peran', $roleName);
+        });
+    }
+
+    public function hasPermission(string $permissionName): bool
+    {
+        $this->loadMissing('peran.hakAkses');
+        $peran = $this->peran;
+        if (! $peran) {
+            return false;
+        }
+
+        return $peran->hakAkses->contains('nama_hak_akses', $permissionName);
     }
 
     public function isAdmin(): bool
@@ -77,26 +153,26 @@ class User extends Authenticatable
 
     public function submissions(): HasMany
     {
-        return $this->hasMany(FormSubmission::class, 'user_id');
+        return $this->hasMany(FormSubmission::class, 'diisi_oleh');
     }
 
     public function createdForms(): HasMany
     {
-        return $this->hasMany(DataForm::class, 'created_by');
+        return $this->hasMany(DataForm::class, 'dibuat_oleh');
     }
 
     public function createdDatasets(): HasMany
     {
-        return $this->hasMany(Dataset::class, 'created_by');
+        return $this->hasMany(Dataset::class, 'dibuat_oleh');
     }
 
     public function createdVisualizations(): HasMany
     {
-        return $this->hasMany(Visualization::class, 'created_by');
+        return $this->hasMany(Visualization::class, 'dibuat_oleh');
     }
 
     public function dataRequests(): HasMany
     {
-        return $this->hasMany(DataRequest::class, 'user_id');
+        return $this->hasMany(DataRequest::class, 'diajukan_oleh');
     }
 }

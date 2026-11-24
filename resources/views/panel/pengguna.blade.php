@@ -87,10 +87,10 @@
                                         <p class="truncate text-sm font-semibold text-slate-900">
                                             {{ $u->name }}
                                             @if($u->id === $authId)
-                                                <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">Anda</span>
+                                                <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Anda</span>
                                             @endif
                                         </p>
-                                        <p class="font-mono text-[11px] text-slate-400">{{ $u->code }}</p>
+                                        <p class="font-mono text-[11px] text-slate-500">{{ $u->code }}</p>
                                     </div>
                                 </div>
                             </td>
@@ -105,9 +105,9 @@
                             </td>
                             <td class="px-4 py-3 text-sm">
                                 @if($u->aktif)
-                                    <span class="inline-flex rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Aktif</span>
+                                    <span class="inline-flex rounded-md bg-[#ECFDF5] px-2 py-0.5 text-[11px] font-bold text-[#047857]">Aktif</span>
                                 @else
-                                    <span class="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">Nonaktif</span>
+                                    <span class="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Nonaktif</span>
                                 @endif
                             </td>
                             <td class="px-4 py-3">
@@ -123,7 +123,7 @@
                                             aktif: @json((bool) $u->aktif),
                                             action: @js(route('panel.pengguna.update', $u->id))
                                         })"
-                                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-sky-300 hover:text-sky-700"
+                                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#0069A8] hover:text-[#0069A8]"
                                         aria-label="Ubah"
                                     >
                                         <i data-lucide="pencil" class="h-4 w-4"></i>
@@ -136,7 +136,7 @@
                                                 action: @js(route('panel.pengguna.destroy', $u->id)),
                                                 method: 'DELETE'
                                             })"
-                                            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-[#DC3545]"
+                                            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-[#B91C1C]"
                                             aria-label="Hapus"
                                         >
                                             <i data-lucide="trash-2" class="h-4 w-4"></i>
@@ -163,8 +163,8 @@
 
     <!-- Add / Edit User Modal -->
     <template x-if="modalOpen">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/40 backdrop-blur-sm sm:place-items-center sm:p-6" @click.self="modalOpen = false" @keydown.escape.window="modalOpen = false">
-            <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="modalOpen = false" @keydown.escape.window="modalOpen = false">
+            <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
                         <p class="text-sm text-slate-500">Akun pengguna</p>

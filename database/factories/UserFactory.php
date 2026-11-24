@@ -26,12 +26,12 @@ class UserFactory extends Factory
     {
         return [
             'code' => 'U-'.strtoupper(Str::random(5)),
-            'name' => fake()->name(),
+            'nama_pengguna' => fake()->name(),
             'nim' => (string) fake()->unique()->numerify('1462######'),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'role' => 'produsen',
+            'kata_sandi' => static::$password ??= Hash::make('password'),
+            'id_peran' => fn () => User::resolveRoleId('produsen'),
             'jenis' => 'Mahasiswa',
             'aktif' => true,
             'remember_token' => Str::random(10),

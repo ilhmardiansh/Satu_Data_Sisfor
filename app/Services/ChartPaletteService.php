@@ -8,8 +8,8 @@ class ChartPaletteService
      * @var array<string, array<int, string>>
      */
     public const PALETTES = [
-        'sky' => ['#4472d0', '#0ea5e9', '#a0bbea', '#0f172a', '#7dd3fc', '#94a3b8'],
-        'blue' => ['#3760bb', '#7398dd', '#a0bbea', '#1c2a4a', '#c7d6f3', '#94a3b8'],
+        'sky' => ['#0069a8', '#00a6f4', '#74d4ff', '#182654', '#0284c7', '#64748b'],
+        'blue' => ['#182654', '#1e3575', '#0069a8', '#00a6f4', '#74d4ff', '#64748b'],
         'indigo' => ['#4f46e5', '#818cf8', '#a5b4fc', '#312e81', '#c7d2fe', '#94a3b8'],
         'cyan' => ['#0891b2', '#22d3ee', '#67e8f9', '#164e63', '#a5f3fc', '#94a3b8'],
         'teal' => ['#0d9488', '#2dd4bf', '#5eead4', '#134e4a', '#99f6e4', '#94a3b8'],

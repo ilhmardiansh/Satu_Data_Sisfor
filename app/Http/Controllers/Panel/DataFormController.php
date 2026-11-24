@@ -9,6 +9,7 @@ use App\Support\CodeGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
@@ -21,22 +22,25 @@ class DataFormController extends Controller
             $status = 'all';
         }
 
-        $now = now();
         $counts = [
             'all' => DataForm::query()->count(),
-            'open' => DataForm::query()->where('deadline', '>', $now)->count(),
-            'closed' => DataForm::query()->where('deadline', '<=', $now)->count(),
+            'open' => DataForm::open()->count(),
+            'closed' => DataForm::closed()->count(),
         ];
 
         $query = DataForm::query()
-            ->with('category')
-            ->withCount('submissions')
+            ->with(['category', 'kolomFormulir'])
+            ->withCount([
+                'submissions',
+                'submissions as valid_submissions_count' => fn ($q) => $q->where('status_validasi', 'valid'),
+                'submissions as raw_submissions_count' => fn ($q) => $q->where('status_validasi', 'mentah'),
+            ])
             ->orderByDesc('created_at');
 
         if ($status === 'open') {
-            $query->where('deadline', '>', $now);
+            $query->open();
         } elseif ($status === 'closed') {
-            $query->where('deadline', '<=', $now);
+            $query->closed();
         }
 
         $forms = $query->paginate(10)->withQueryString();
@@ -49,18 +53,24 @@ class DataFormController extends Controller
     {
         $data = $this->validatePayload($request, true);
 
-        DataForm::create([
-            'code' => CodeGenerator::next('F', 'data_forms'),
-            'category_id' => $data['category_id'],
-            'title' => $data['title'],
-            'description' => $data['description'],
-            'tahun' => $data['tahun'],
-            'periode' => $data['periode'],
-            'target' => $data['target'],
-            'deadline' => $data['deadline'],
-            'fields' => $data['fields'],
-            'created_by' => $request->user()->id,
-        ]);
+        DB::transaction(function () use ($request, $data): void {
+            $form = DataForm::create([
+                'code' => CodeGenerator::next('F', 'formulir'),
+                'id_kategori' => $data['category_id'],
+                'judul' => $data['title'],
+                'deskripsi' => $data['description'],
+                'tahun' => $data['tahun'],
+                'periode' => $data['periode'],
+                'target' => $data['target'],
+                'batasi_satu_respon' => $data['batasi_satu_respon'],
+                'status_preprocessing' => 'belum',
+                'tanggal_waktu' => $data['deadline'],
+                'status_aktif' => true,
+                'dibuat_oleh' => $request->user()->id,
+            ]);
+
+            $form->syncFields($data['fields']);
+        });
 
         return redirect()->route('panel.formulir')
             ->with('success', 'Formulir Berhasil Dibuat');
@@ -70,19 +80,41 @@ class DataFormController extends Controller
     {
         $data = $this->validatePayload($request, false);
 
-        $dataForm->update([
-            'category_id' => $data['category_id'],
-            'title' => $data['title'],
-            'description' => $data['description'],
-            'tahun' => $data['tahun'],
-            'periode' => $data['periode'],
-            'target' => $data['target'],
-            'deadline' => $data['deadline'],
-            'fields' => $data['fields'],
-        ]);
+        DB::transaction(function () use ($dataForm, $data): void {
+            $dataForm->update([
+                'id_kategori' => $data['category_id'],
+                'judul' => $data['title'],
+                'deskripsi' => $data['description'],
+                'tahun' => $data['tahun'],
+                'periode' => $data['periode'],
+                'target' => $data['target'],
+                'batasi_satu_respon' => $data['batasi_satu_respon'],
+                'tanggal_waktu' => $data['deadline'],
+                'status_aktif' => $data['deadline']->isFuture(),
+            ]);
+
+            $dataForm->syncFields($data['fields']);
+        });
 
         return redirect()->route('panel.formulir')
             ->with('success', 'Formulir diperbarui.');
+    }
+
+    public function toggleActive(DataForm $dataForm): RedirectResponse
+    {
+        if ($dataForm->status_aktif) {
+            $dataForm->tutupFormulir();
+
+            return back()->with('info', "Formulir “{$dataForm->judul}” ditutup.");
+        }
+
+        if ($dataForm->tanggal_waktu === null || $dataForm->tanggal_waktu->isPast()) {
+            return back()->with('error', 'Tenggat waktu formulir sudah lewat. Perpanjang tenggat melalui tombol Ubah sebelum membuka kembali.');
+        }
+
+        $dataForm->update(['status_aktif' => true]);
+
+        return back()->with('success', "Formulir “{$dataForm->judul}” dibuka kembali.");
     }
 
     public function destroy(DataForm $dataForm): RedirectResponse
@@ -101,6 +133,7 @@ class DataFormController extends Controller
      *     tahun: int,
      *     periode: string,
      *     target: string,
+     *     batasi_satu_respon: bool,
      *     deadline: Carbon,
      *     fields: array<int, array<string, mixed>>
      * }
@@ -110,10 +143,11 @@ class DataFormController extends Controller
         $rules = [
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'category_id' => ['required', 'integer', 'exists:kategori,id'],
             'tahun' => ['required', 'digits:4'],
             'periode' => ['required', 'in:Ganjil,Genap'],
             'target' => ['required', 'in:Mahasiswa,Dosen,Semua'],
+            'batasi_satu_respon' => ['nullable', 'boolean'],
             'deadline' => $isCreate ? ['required', 'date', 'after:now'] : ['required', 'date'],
             'fields_json' => ['required', 'string'],
         ];
@@ -135,7 +169,7 @@ class DataFormController extends Controller
             throw new \Illuminate\Validation\ValidationException($validator);
         }
 
-        $allowedTypes = ['text', 'textarea', 'number', 'date', 'select', 'file'];
+        $allowedTypes = ['text', 'textarea', 'number', 'date', 'radio', 'checkbox', 'select', 'file'];
         $cleanFields = [];
 
         foreach ($rawFields as $index => $item) {
@@ -146,6 +180,7 @@ class DataFormController extends Controller
             $type = (string) ($item['type'] ?? 'text');
             $fid = trim((string) ($item['id'] ?? '')) ?: 'q'.($index + 1);
             $required = (bool) ($item['required'] ?? false);
+            $help = trim((string) ($item['help'] ?? ''));
 
             if ($label === '') {
                 $validator->errors()->add('fields_json', 'Label pertanyaan wajib diisi.');
@@ -159,11 +194,12 @@ class DataFormController extends Controller
             $fieldData = [
                 'id' => $fid,
                 'label' => $label,
+                'help' => $help,
                 'type' => $type,
                 'required' => $required,
             ];
 
-            if ($type === 'select') {
+            if (in_array($type, ['select', 'radio', 'checkbox'], true)) {
                 $optsRaw = $item['options'] ?? ($item['opt'] ?? []);
                 $options = is_array($optsRaw)
                     ? array_values(array_filter(array_map('trim', array_map('strval', $optsRaw))))
@@ -186,6 +222,7 @@ class DataFormController extends Controller
             'tahun' => (int) $validated['tahun'],
             'periode' => $validated['periode'],
             'target' => $validated['target'],
+            'batasi_satu_respon' => $request->boolean('batasi_satu_respon'),
             'deadline' => Carbon::parse($validated['deadline']),
             'fields' => $cleanFields,
         ];

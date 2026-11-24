@@ -17,29 +17,40 @@
             alt="Gedung kampus UNUSA"
             class="absolute inset-0 h-full w-full object-cover"
         />
-        <div class="absolute inset-0 bg-gradient-to-br from-benhur/95 via-benhur/85 to-deep/75"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-[#182654]/95 via-[#182654]/88 to-[#1E3575]/75"></div>
         <div data-scene="network"
              aria-hidden="true"
              class="pointer-events-none absolute inset-0 opacity-65"
              style="mask-image: radial-gradient(closest-side, #000 55%, transparent 98%); -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 98%);"></div>
         <div class="relative z-10 flex h-full flex-col justify-center p-10 text-white xl:p-12">
-            <span class="sd-glass-panel mb-5 inline-flex w-fit items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium">
+            <p class="mb-4 flex items-center gap-2 text-xs font-bold tracking-wider text-[#74D4FF] uppercase">
+                <span class="h-px w-6 bg-[#74D4FF]" aria-hidden="true"></span>
                 Area internal
-            </span>
-            <h1 class="max-w-md text-[40px] leading-tight font-extrabold tracking-tight drop-shadow-xs">
-                Kelola <span class="text-accent-soft">data prodi</span> dalam satu tempat
+            </p>
+            <h1 class="max-w-md text-[38px] leading-tight font-extrabold tracking-tight">
+                Kelola <span class="text-[#74D4FF]">data prodi</span> dalam satu tempat
             </h1>
             <p class="mt-4 max-w-md text-lg text-white/85">
                 Isi formulir, kelola data dan dataset, buat visualisasi, dan konfirmasi permohonan data sesuai peran Anda.
             </p>
+            <div class="mt-8">
+                <button type="button"
+                        data-motion-toggle
+                        onclick="toggleSceneMotion(this)"
+                        aria-pressed="false"
+                        class="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-white/20">
+                    <i data-lucide="pause-circle" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                    <span data-motion-label>{{ $t('Jeda latar 3D', 'Pause 3D backdrop') }}</span>
+                </button>
+            </div>
         </div>
     </section>
 
-    <section class="flex items-center justify-center px-4 py-8 sm:px-8 lg:py-10">
-        <div class="sd-card w-full max-w-md p-6 sm:p-8">
+    <section class="flex items-center justify-center bg-white px-4 py-8 sm:px-8 lg:py-10">
+        <div class="w-full max-w-md">
             <div class="flex items-center gap-3">
-                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-brand to-brand-dark text-white shadow-[0_2px_6px_rgba(68,114,208,0.35),inset_0_1px_0_rgba(255,255,255,0.25)]">
-                    <i data-lucide="database" class="h-5 w-5"></i>
+                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#0069A8] text-white">
+                    <i data-lucide="database" class="h-5 w-5" aria-hidden="true"></i>
                 </span>
                 <h2 class="text-2xl leading-tight font-extrabold tracking-tight sm:text-[28px]">
                     {{ $t('Masuk ke Satu Data', 'Sign in to Satu Data') }}
@@ -145,7 +156,7 @@
                 </div>
             </div>
 
-            <a href="{{ route('beranda') }}" class="mt-5 inline-block text-sm font-semibold text-sky-600 hover:text-sky-700">
+            <a href="{{ route('beranda') }}" class="mt-5 inline-block text-sm font-semibold text-[#0069A8] hover:text-[#1E3575]">
                 ← {{ $t('Kembali ke beranda', 'Back to home') }}
             </a>
         </div>

@@ -16,14 +16,14 @@ class BeritaController extends Controller
         $query = NewsArticle::query()->orderByDesc('created_at')->orderBy('id');
 
         if ($selectedTag !== '' && $selectedTag !== 'Semua') {
-            $query->where('badge', $selectedTag);
+            $query->where('kategori_badge', $selectedTag);
         }
 
         if ($q !== '') {
             $like = '%'.strtolower($q).'%';
             $query->where(function ($sub) use ($like): void {
-                $sub->whereRaw('LOWER(title) LIKE ?', [$like])
-                    ->orWhereRaw('LOWER(excerpt) LIKE ?', [$like]);
+                $sub->whereRaw('LOWER(judul) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(ringkasan) LIKE ?', [$like]);
             });
         }
 
