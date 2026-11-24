@@ -10,10 +10,10 @@
 <div x-data="vizManager()">
     <x-panel-head
         title="Visualisasi Dashboard"
-        desc="Tentukan data yang tampil di Dashboard. Pengunjung tetap dapat mengubah parameter kolom dan jenis grafik."
+        desc="Bangun grafik interaktif dari dataset bernumerik yang telah tersusun. Pengunjung dapat mengubah kolom dan tipe grafik langsung di Dashboard."
     >
-        <button type="button" @click="openNew()" class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 motion-safe:active:scale-[0.97]">
-            <i data-lucide="plus" class="h-4 w-4"></i>
+        <button type="button" @click="openNew()" {{ empty($datasetsPayload) ? 'disabled' : '' }} class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#0069A8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#182654] disabled:cursor-not-allowed disabled:opacity-45">
+            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
             Buat visualisasi
         </button>
     </x-panel-head>
@@ -28,8 +28,16 @@
                      x-data="{ shown: @js((bool) $v['show']), busy: false }">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="font-bold text-slate-900">{{ $v['title'] }}</p>
-                            <p class="truncate text-xs text-slate-500">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#0069A8]">{{ $v['code'] }}</span>
+                                @if(! ($v['datasetPublished'] ?? true))
+                                    <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">Sumber Draft</span>
+                                @elseif(($v['datasetAccess'] ?? 'public') === 'private')
+                                    <span class="rounded bg-[#FFFBEB] px-1.5 py-0.5 text-[10px] font-bold text-[#92400E]">Sumber Private</span>
+                                @endif
+                            </div>
+                            <p class="mt-1 font-bold text-slate-900">{{ $v['title'] }}</p>
+                            <p class="truncate text-xs text-[#475569]">
                                 {{ $v['datasetTitle'] }} · oleh {{ $v['creatorName'] }}
                             </p>
                         </div>
@@ -64,12 +72,12 @@
                     <div class="mt-4 h-40" id="panelVizChart_{{ $v['code'] }}"></div>
 
                     <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                        <span class="text-xs font-semibold" :class="shown ? 'text-emerald-600' : 'text-slate-400'" x-text="shown ? 'Tampil di Dashboard' : 'Disembunyikan'"></span>
+                        <span class="text-xs font-semibold" :class="shown ? 'text-[#047857]' : 'text-slate-500'" x-text="shown ? 'Tampil di Dashboard' : 'Disembunyikan'"></span>
                         <div class="flex gap-1.5">
                             <button
                                 type="button"
                                 @click="openEdit(@js($v))"
-                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-sky-300 hover:text-sky-700"
+                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#0069A8] hover:text-[#0069A8]"
                                 aria-label="Ubah"
                             >
                                 <i data-lucide="pencil" class="h-4 w-4"></i>
@@ -82,7 +90,7 @@
                                         action: @js(route('panel.visualisasi.destroy', $v['code'])),
                                         method: 'DELETE'
                                     })"
-                                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-[#DC3545]"
+                                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-[#B91C1C]"
                                     aria-label="Hapus"
                                 >
                                     <i data-lucide="trash-2" class="h-4 w-4"></i>
@@ -95,26 +103,34 @@
         </div>
     @else
         <div class="rounded-2xl border border-dashed border-slate-300 bg-surface px-6 py-14 text-center">
-            <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-400">
-                <i data-lucide="bar-chart-3" class="h-6 w-6"></i>
+            <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-500">
+                <i data-lucide="bar-chart-3" class="h-6 w-6" aria-hidden="true"></i>
             </span>
-            <p class="mt-4 font-bold text-slate-800">Belum ada visualisasi</p>
-            <p class="mt-1 text-sm text-slate-500">Buat visualisasi pertama dari dataset yang tersedia.</p>
+            @if(empty($datasetsPayload))
+                <p class="mt-4 font-bold text-slate-800">Belum ada dataset bernumerik untuk divisualisasikan</p>
+                <p class="mt-1 text-sm text-[#475569]">Susun dataset rekap atau tabel bernumerik dari data yang telah lolos Pre-processing terlebih dahulu.</p>
+                <a href="{{ route('panel.dataset') }}" class="mt-4 inline-flex min-h-[42px] items-center rounded-xl bg-[#0069A8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#182654]">
+                    Kelola Dataset
+                </a>
+            @else
+                <p class="mt-4 font-bold text-slate-800">Belum ada visualisasi</p>
+                <p class="mt-1 text-sm text-[#475569]">Buat visualisasi pertama dari dataset bernumerik yang telah Anda susun.</p>
+            @endif
         </div>
     @endif
 
     <!-- VizBuilder Modal -->
     <template x-if="modalOpen">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/40 backdrop-blur-sm sm:place-items-center sm:p-6" @click.self="modalOpen = false">
-            <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="modalOpen = false" @keydown.escape.window="modalOpen = false">
+            <div role="dialog" aria-modal="true" aria-labelledby="panel-viz-modal-title" class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
-                        <p class="text-sm text-slate-500">Visualisasi dashboard</p>
-                        <h2 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl" x-text="isEdit ? 'Ubah visualisasi' : 'Buat visualisasi'"></h2>
-                        <p class="mt-1 text-sm text-slate-500">Pilih data yang ingin ditampilkan di Dashboard dalam bentuk angka atau grafik.</p>
+                        <p class="text-sm font-medium text-[#475569]">Visualisasi dashboard</p>
+                        <h2 id="panel-viz-modal-title" class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl" x-text="isEdit ? 'Ubah visualisasi' : 'Buat visualisasi'"></h2>
+                        <p class="mt-1 text-sm text-[#475569]">Pilih data yang ingin ditampilkan di Dashboard dalam bentuk angka atau grafik.</p>
                     </div>
-                    <button type="button" @click="modalOpen = false" aria-label="Tutup" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-700">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <button type="button" @click="modalOpen = false" aria-label="Tutup" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-[#0069a8] hover:text-[#0069a8]">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
 
@@ -136,10 +152,10 @@
                             </label>
 
                             <label class="block">
-                                <span class="mb-1.5 block text-sm font-semibold text-slate-800">Sumber dataset <span class="text-[#DC3545]">*</span></span>
-                                <select name="dataset_id" x-model="v.dataset_id" @change="onDatasetChange()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100">
+                                <span class="mb-1.5 block text-sm font-semibold text-slate-800">Sumber dataset <span class="text-[#B91C1C]">*</span></span>
+                                <select name="dataset_id" x-model="v.dataset_id" @change="onDatasetChange()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0069A8] focus:ring-4 focus:ring-sky-100">
                                     <template x-for="ds in usableDatasets" :key="ds.id">
-                                        <option :value="String(ds.id)" x-text="ds.title + (ds.access === 'private' ? ' (private)' : '')"></option>
+                                        <option :value="String(ds.id)" x-text="ds.title + (!ds.published ? ' (draft)' : (ds.access === 'private' ? ' (private)' : ''))"></option>
                                     </template>
                                 </select>
                             </label>
@@ -190,8 +206,13 @@
                                 Tampilkan di Dashboard publik
                             </label>
 
-                            <template x-if="currentDataset()?.access === 'private' && v.show">
-                                <p class="text-xs text-amber-700">
+                            <template x-if="currentDataset() && !currentDataset().published && v.show">
+                                <p class="text-xs font-medium text-[#92400E]">
+                                    Catatan: dataset sumber masih berstatus Draft. Terbitkan dataset di menu Kelola Dataset agar visualisasi muncul di Dashboard publik.
+                                </p>
+                            </template>
+                            <template x-if="currentDataset() && currentDataset().published && currentDataset().access === 'private' && v.show">
+                                <p class="text-xs font-medium text-[#92400E]">
                                     Catatan: dataset sumber berstatus private, sehingga visualisasi ini hanya terlihat oleh Wali Data dan Admin. Jadikan dataset publik agar tampil di Dashboard publik.
                                 </p>
                             </template>

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\DataForm;
 use App\Models\Dataset;
-use App\Models\FormSubmission;
 use App\Services\DataQualityService;
 use App\Services\DatasetBuilderService;
 use App\Support\CodeGenerator;
@@ -17,14 +16,17 @@ use Illuminate\View\View;
 
 class ManageDatasetController extends Controller
 {
-    public function index(Request $request, DataQualityService $quality): View
-    {
+    public function index(
+        Request $request,
+        DataQualityService $quality,
+        DatasetBuilderService $builder
+    ): View {
         $q = trim((string) $request->query('q', ''));
         $kategori = (string) $request->query('kategori', 'all');
         $tahun = (string) $request->query('tahun', 'all');
 
         $query = Dataset::query()
-            ->with('category')
+            ->with(['category', 'sourceForm'])
             ->orderByDesc('tahun')
             ->orderByDesc('id');
 
@@ -35,12 +37,12 @@ class ManageDatasetController extends Controller
         }
 
         if ($tahun !== '' && $tahun !== 'all') {
-            $query->where('tahun', (int) $tahun);
+            $query->where('tahun', (string) $tahun);
         }
 
         if ($q !== '') {
             $like = '%'.strtolower($q).'%';
-            $query->whereRaw('LOWER(title) LIKE ?', [$like]);
+            $query->whereRaw('LOWER(judul) LIKE ?', [$like]);
         }
 
         $datasets = $query->paginate(10)->withQueryString();
@@ -48,35 +50,11 @@ class ManageDatasetController extends Controller
         $years = Dataset::query()->distinct()->orderByDesc('tahun')->pluck('tahun');
 
         $allForms = DataForm::query()
-            ->with('category')
+            ->with(['category', 'kolomFormulir'])
             ->orderByDesc('created_at')
             ->get();
 
-        $builderFormsPayload = $allForms->map(function (DataForm $f) use ($quality): array {
-            $subs = $f->submissions()->with('user')->orderByDesc('submitted_at')->get();
-            $issuesMap = $quality->inspectSubmissions($f, $subs);
-            $dirty = collect($issuesMap)->contains(fn (array $issues): bool => ! empty($issues));
-
-            return [
-                'id' => $f->id,
-                'code' => $f->code,
-                'title' => $f->title,
-                'desc' => $f->description ?? '',
-                'category_id' => $f->category_id,
-                'kategoriCode' => $f->category?->code ?? '',
-                'tahun' => $f->tahun,
-                'periode' => $f->periode,
-                'fields' => $f->fields ?? [],
-                'sourceCols' => $f->sourceCols(),
-                'dirty' => $dirty,
-                'subs' => $subs->map(fn (FormSubmission $s): array => [
-                    'nama' => $s->user?->name ?? '-',
-                    'nim' => $s->user?->nim ?? '-',
-                    'at' => $s->submittedFormatted(),
-                    'values' => $s->values ?? [],
-                ])->values()->all(),
-            ];
-        })->values()->all();
+        $builderFormsPayload = $builder->builderFormsPayload($allForms, $quality);
 
         return view('panel.dataset', compact(
             'datasets',
@@ -95,17 +73,24 @@ class ManageDatasetController extends Controller
         DatasetBuilderService $builder
     ): RedirectResponse {
         $validated = $request->validate([
-            'form_id' => ['required', 'integer', 'exists:data_forms,id'],
+            'form_id' => ['required', 'integer', 'exists:formulir,id'],
             'mode' => ['required', 'in:rekap,rinci'],
             'group_field_id' => ['required_if:mode,rekap', 'nullable', 'string'],
+            'agg_func' => ['nullable', 'in:count,sum,avg,min,max'],
+            'agg_field_id' => ['nullable', 'string'],
             'picked_cols' => ['required_if:mode,rinci', 'array'],
             'picked_cols.*' => ['string'],
+            'col_aliases' => ['nullable', 'array'],
+            'col_aliases.*' => ['nullable', 'string', 'max:120'],
+            'masked_cols' => ['nullable', 'array'],
+            'masked_cols.*' => ['string'],
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'category_id' => ['required', 'integer', 'exists:kategori,id'],
             'tahun' => ['required', 'digits:4'],
             'periode' => ['required', 'in:Ganjil,Genap'],
             'access' => ['required', 'in:public,private'],
+            'publish_status' => ['nullable', 'in:draft,terpublikasi'],
             'format' => ['required', 'in:CSV,XLSX'],
         ], [
             'title.required' => 'Judul wajib diisi.',
@@ -114,65 +99,113 @@ class ManageDatasetController extends Controller
             'picked_cols.required_if' => 'Pilih minimal satu kolom.',
         ]);
 
-        $form = DataForm::query()->findOrFail($validated['form_id']);
-        $subs = $form->submissions()->with('user')->orderByDesc('submitted_at')->get();
+        $form = DataForm::query()->with('kolomFormulir')->findOrFail($validated['form_id']);
 
-        if ($subs->isEmpty()) {
-            return back()->withInput()->with('error', 'Belum ada isian sumber untuk dibuat menjadi dataset.');
+        if (! $form->isPreprocessed()) {
+            return back()->withInput()->with(
+                'error',
+                'Formulir belum menyelesaikan fase Pre-processing. Jalankan Finalisasi pada menu Pre-processing Data sebelum menyusun dataset.'
+            );
         }
 
-        $issuesMap = $quality->inspectSubmissions($form, $subs);
+        $validSubs = $form->submissions()
+            ->with(['user', 'dataIsian.kolomFormulir'])
+            ->where('status_validasi', 'valid')
+            ->orderByDesc('waktu_pengisian')
+            ->get();
+
+        if ($validSubs->isEmpty()) {
+            return back()->withInput()->with('error', 'Belum ada baris berstatus valid hasil pre-processing untuk dibuat menjadi dataset.');
+        }
+
+        $issuesMap = $quality->inspectSubmissions($form, $validSubs);
         $hasIssues = collect($issuesMap)->contains(fn (array $issues): bool => ! empty($issues));
         if ($hasIssues) {
-            return back()->withInput()->with('error', 'Data sumber belum bersih. Perbaiki melalui menu Data Terkumpul sebelum membuat dataset.');
+            return back()->withInput()->with('error', 'Data sumber masih memiliki masalah kualitas. Perbaiki dan finalisasi ulang melalui menu Pre-processing Data.');
         }
+
+        $aggFunc = (string) ($validated['agg_func'] ?? 'count');
+        $aggFieldId = ($validated['agg_field_id'] ?? null) ?: null;
+        $formFields = collect($form->fields ?? []);
+        if ($validated['mode'] === 'rekap' && $aggFunc !== 'count') {
+            $numericTarget = $formFields->firstWhere('id', $aggFieldId);
+            if (! $numericTarget || ($numericTarget['type'] ?? '') !== 'number') {
+                return back()->withInput()->with('error', 'Pilih kolom bertipe angka untuk fungsi agregasi total, rata-rata, minimum, atau maksimum.');
+            }
+        }
+
+        $options = [
+            'agg_func' => $aggFunc,
+            'agg_field_id' => $aggFieldId,
+            'col_aliases' => $validated['col_aliases'] ?? [],
+            'masked_cols' => $validated['masked_cols'] ?? [],
+        ];
 
         $built = $builder->buildFromForm(
             $form,
-            $subs,
+            $validSubs,
             $validated['mode'],
             $validated['group_field_id'] ?? null,
-            $validated['picked_cols'] ?? []
+            $validated['picked_cols'] ?? [],
+            $options
         );
 
         if (empty($built['cols'])) {
             return back()->withInput()->with('error', 'Pilih minimal satu kolom.');
         }
 
+        $publishStatus = (string) ($validated['publish_status'] ?? 'terpublikasi');
+
         $dataset = Dataset::create([
-            'code' => CodeGenerator::next('DS', 'datasets'),
-            'category_id' => (int) $validated['category_id'],
-            'source_form_id' => $form->id,
-            'title' => trim($validated['title']),
-            'description' => trim((string) ($validated['description'] ?? '')) ?: "Dibuat dari formulir {$form->title}.",
-            'tahun' => (int) $validated['tahun'],
+            'code' => CodeGenerator::next('DS', 'dataset'),
+            'id_kategori' => (int) $validated['category_id'],
+            'id_formulir_sumber' => $form->id,
+            'judul' => trim($validated['title']),
+            'deskripsi' => trim((string) ($validated['description'] ?? '')) ?: "Disusun dari formulir {$form->judul} setelah fase pre-processing.",
+            'tahun' => (string) $validated['tahun'],
             'periode' => $validated['periode'],
-            'access' => $validated['access'],
+            'tipe_akses' => $validated['access'],
+            'status_publikasi' => $publishStatus,
             'format' => $validated['format'],
-            'updated_label' => now()->locale('id')->translatedFormat('j M Y'),
-            'cols' => $built['cols'],
-            'rows' => $built['rows'],
-            'created_by' => $request->user()->id,
+            'label_diperbarui' => now()->locale('id')->translatedFormat('j M Y'),
+            'kolom' => $built['cols'],
+            'baris' => $built['rows'],
+            'konfigurasi_sumber' => [
+                'mode' => $validated['mode'],
+                'group_field_id' => $validated['group_field_id'] ?? null,
+                'agg_func' => $aggFunc,
+                'agg_field_id' => $aggFieldId,
+                'picked_cols' => array_values($validated['picked_cols'] ?? []),
+                'col_aliases' => $validated['col_aliases'] ?? [],
+                'masked_cols' => array_values($validated['masked_cols'] ?? []),
+                'source_form_code' => $form->code,
+                'source_form_title' => $form->judul,
+                'valid_rows_count' => $validSubs->count(),
+                'preprocessed_at' => $form->waktu_diproses?->toIso8601String(),
+                'preprocessing_logs_count' => count($form->ringkasan_preprocessing['logs'] ?? []),
+            ],
+            'dibuat_oleh' => $request->user()->id,
         ]);
 
-        $accessLabel = $dataset->access === 'public' ? 'publik' : 'private';
+        $accessLabel = $dataset->tipe_akses === 'public' ? 'publik' : 'private';
+        $pubLabel = $dataset->isPublished() ? 'terpublikasi' : 'draft';
 
         return redirect()->route('panel.dataset')
-            ->with('success', "Dataset “{$dataset->title}” dibuat ({$accessLabel}).");
+            ->with('success', "Dataset “{$dataset->judul}” dibuat ({$pubLabel}, {$accessLabel}).");
     }
 
     public function toggleAccess(Request $request, Dataset $dataset): JsonResponse|RedirectResponse
     {
         $newAccess = $request->has('access')
             ? ($request->input('access') === 'public' ? 'public' : 'private')
-            : ($dataset->access === 'public' ? 'private' : 'public');
+            : ($dataset->tipe_akses === 'public' ? 'private' : 'public');
 
         $dataset->update([
-            'access' => $newAccess,
+            'tipe_akses' => $newAccess,
         ]);
 
         $label = $newAccess === 'public' ? 'publik' : 'private';
-        $message = "“{$dataset->title}” kini {$label}.";
+        $message = "“{$dataset->judul}” kini {$label}.";
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -184,15 +217,108 @@ class ManageDatasetController extends Controller
         return back()->with('info', $message);
     }
 
+    public function togglePublish(Request $request, Dataset $dataset): JsonResponse|RedirectResponse
+    {
+        $next = $request->has('status_publikasi')
+            ? ($request->input('status_publikasi') === 'terpublikasi' ? 'terpublikasi' : 'draft')
+            : ($dataset->isPublished() ? 'draft' : 'terpublikasi');
+
+        $dataset->update([
+            'status_publikasi' => $next,
+        ]);
+
+        $message = $next === 'terpublikasi'
+            ? "Dataset “{$dataset->judul}” kini terpublikasi di portal."
+            : "Dataset “{$dataset->judul}” dipindahkan ke Draft.";
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status_publikasi' => $next,
+                'message' => $message,
+            ]);
+        }
+
+        return back()->with('info', $message);
+    }
+
+    public function syncFromForm(
+        Dataset $dataset,
+        DataQualityService $quality,
+        DatasetBuilderService $builder
+    ): RedirectResponse {
+        $form = $dataset->sourceForm;
+        if (! $form) {
+            return back()->with('error', 'Dataset ini tidak memiliki formulir sumber untuk disinkronkan.');
+        }
+
+        $form->loadMissing('kolomFormulir');
+        if (! $form->isPreprocessed()) {
+            return back()->with(
+                'error',
+                "Formulir {$form->judul} belum menyelesaikan Finalisasi Pre-processing terbaru. Selesaikan di menu Pre-processing Data terlebih dahulu."
+            );
+        }
+
+        $validSubs = $form->submissions()
+            ->with(['user', 'dataIsian.kolomFormulir'])
+            ->where('status_validasi', 'valid')
+            ->orderByDesc('waktu_pengisian')
+            ->get();
+
+        if ($validSubs->isEmpty()) {
+            return back()->with('error', 'Tidak ada baris valid yang tersedia untuk menyinkronkan dataset.');
+        }
+
+        $issuesMap = $quality->inspectSubmissions($form, $validSubs);
+        if (collect($issuesMap)->contains(fn (array $issues): bool => ! empty($issues))) {
+            return back()->with('error', 'Data sumber belum bersih. Perbaiki melalui menu Pre-processing Data sebelum sinkronisasi.');
+        }
+
+        $cfg = is_array($dataset->konfigurasi_sumber) ? $dataset->konfigurasi_sumber : [];
+        $mode = (string) ($cfg['mode'] ?? 'rinci');
+        $pickedCols = is_array($cfg['picked_cols'] ?? null)
+            ? $cfg['picked_cols']
+            : array_map(fn (array $c): string => $c['id'], $form->sourceCols());
+
+        $built = $builder->buildFromForm(
+            $form,
+            $validSubs,
+            $mode,
+            $cfg['group_field_id'] ?? null,
+            $pickedCols,
+            [
+                'agg_func' => $cfg['agg_func'] ?? 'count',
+                'agg_field_id' => $cfg['agg_field_id'] ?? null,
+                'col_aliases' => $cfg['col_aliases'] ?? [],
+                'masked_cols' => $cfg['masked_cols'] ?? [],
+            ]
+        );
+
+        $cfg['valid_rows_count'] = $validSubs->count();
+        $cfg['preprocessed_at'] = $form->waktu_diproses?->toIso8601String();
+        $cfg['synced_at'] = now()->toIso8601String();
+
+        $dataset->update([
+            'kolom' => $built['cols'],
+            'baris' => $built['rows'],
+            'label_diperbarui' => now()->locale('id')->translatedFormat('j M Y'),
+            'konfigurasi_sumber' => $cfg,
+        ]);
+
+        return redirect()->route('panel.dataset')
+            ->with('success', "Dataset “{$dataset->judul}” berhasil disinkronkan ({$validSubs->count()} baris valid).");
+    }
+
     public function update(Request $request, Dataset $dataset): RedirectResponse
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'category_id' => ['required', 'integer', 'exists:kategori,id'],
             'tahun' => ['required', 'digits:4'],
             'periode' => ['required', 'in:Ganjil,Genap'],
             'access' => ['required', 'in:public,private'],
+            'publish_status' => ['nullable', 'in:draft,terpublikasi'],
             'format' => ['required', 'in:CSV,XLSX'],
         ], [
             'title.required' => 'Judul wajib diisi.',
@@ -201,14 +327,15 @@ class ManageDatasetController extends Controller
         ]);
 
         $dataset->update([
-            'title' => trim($validated['title']),
-            'description' => trim((string) ($validated['description'] ?? '')),
-            'category_id' => (int) $validated['category_id'],
-            'tahun' => (int) $validated['tahun'],
+            'judul' => trim($validated['title']),
+            'deskripsi' => trim((string) ($validated['description'] ?? '')),
+            'id_kategori' => (int) $validated['category_id'],
+            'tahun' => (string) $validated['tahun'],
             'periode' => $validated['periode'],
-            'access' => $validated['access'],
+            'tipe_akses' => $validated['access'],
+            'status_publikasi' => (string) ($validated['publish_status'] ?? $dataset->status_publikasi ?? 'terpublikasi'),
             'format' => $validated['format'],
-            'updated_label' => now()->locale('id')->translatedFormat('j M Y'),
+            'label_diperbarui' => now()->locale('id')->translatedFormat('j M Y'),
         ]);
 
         return redirect()->route('panel.dataset')

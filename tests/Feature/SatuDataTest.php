@@ -2,24 +2,24 @@
 
 namespace Tests\Feature;
 
-use App\Models\AmiBenchmark;
-use App\Models\AmiIndicator;
-use App\Models\AmiPtkFinding;
-use App\Models\AmiRecommendation;
-use App\Models\AmiStandardSummary;
 use App\Models\Category;
 use App\Models\DataForm;
 use App\Models\DataRequest;
 use App\Models\Dataset;
 use App\Models\FormSubmission;
 use App\Models\NewsArticle;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\SubmissionValue;
 use App\Models\User;
 use App\Models\Visualization;
 use App\Services\ChartPaletteService;
+use App\Services\SpreadsheetExportService;
 use Database\Seeders\SatuDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 use ZipArchive;
@@ -35,10 +35,23 @@ class SatuDataTest extends TestCase
         $this->seed(SatuDataSeeder::class);
     }
 
-    public function test_public_pages_render_with_compiled_vite_assets(): void
+    public function test_clean_slate_seed_and_public_pages_render_without_dummy_input_data(): void
     {
-        $news = NewsArticle::query()->firstOrFail();
+        // Clean-slate verification: 0 forms, submissions, datasets, visualizations, and requests
+        $this->assertSame(0, DataForm::query()->count());
+        $this->assertSame(0, FormSubmission::query()->count());
+        $this->assertSame(0, SubmissionValue::query()->count());
+        $this->assertSame(0, Dataset::query()->count());
+        $this->assertSame(0, DataRequest::query()->count());
+        $this->assertSame(0, Visualization::query()->count());
 
+        // Master data preserved
+        $this->assertSame(3, Role::query()->count());
+        $this->assertSame(14, Permission::query()->count());
+        $this->assertSame(5, User::query()->count());
+        $this->assertSame(13, Category::query()->count());
+
+        $news = NewsArticle::query()->firstOrFail();
         $urls = [
             '/',
             '/dashboard',
@@ -56,9 +69,18 @@ class SatuDataTest extends TestCase
             $response->assertDontSee('cdn.tailwindcss.com', false);
         }
 
-        $home = $this->get('/');
-        $home->assertSee('/build/assets/', false);
-        $home->assertSee('Satu Data Sistem Informasi', false);
+        $this->get('/dashboard')
+            ->assertStatus(200)
+            ->assertSee('Belum ada visualisasi dashboard yang diterbitkan', false)
+            ->assertDontSee('Mahasiswa Aktif', false);
+
+        $this->get('/dataset')
+            ->assertStatus(200)
+            ->assertSee('Belum ada dataset yang diterbitkan', false);
+
+        $this->get('/pengisian-data')
+            ->assertStatus(200)
+            ->assertSee('Belum ada formulir pengumpulan data aktif', false);
     }
 
     public function test_language_switcher_persists_locale_in_session(): void
@@ -82,7 +104,6 @@ class SatuDataTest extends TestCase
 
     public function test_authentication_and_30_minute_idle_timeout(): void
     {
-        // Wrong password rejected
         $this->from('/login')->post(route('login.post'), [
             'nim' => 'admin',
             'password' => 'wrongpass',
@@ -90,14 +111,13 @@ class SatuDataTest extends TestCase
             ->assertSessionHas('error');
         $this->assertGuest();
 
-        // Inactive account rejected on login
         $inactive = User::factory()->create([
             'code' => 'U-TEST-INACTIVE',
-            'name' => 'Nonaktif User',
+            'nama_pengguna' => 'Nonaktif User',
             'nim' => '9999999999',
-            'role' => 'produsen',
+            'id_peran' => User::resolveRoleId('produsen'),
             'jenis' => 'Mahasiswa',
-            'password' => Hash::make('secret123'),
+            'kata_sandi' => Hash::make('secret123'),
             'aktif' => false,
         ]);
 
@@ -108,7 +128,6 @@ class SatuDataTest extends TestCase
             ->assertSessionHas('error', 'Akun Anda dinonaktifkan. Hubungi Admin prodi.');
         $this->assertGuest();
 
-        // Valid logins redirect to panel ringkasan
         foreach ([
             ['admin', 'admin123'],
             ['walidata', 'wali123'],
@@ -123,7 +142,6 @@ class SatuDataTest extends TestCase
             $this->assertGuest();
         }
 
-        // Idle timeout >= 30 minutes auto-logs user out and flashes notice
         $admin = User::query()->where('nim', 'admin')->firstOrFail();
 
         $this->actingAs($admin)
@@ -134,7 +152,6 @@ class SatuDataTest extends TestCase
 
         $this->assertGuest();
 
-        // Mid-session deactivation also logs user out
         $inactive->update(['aktif' => false]);
         $this->actingAs($inactive)
             ->withSession(['last_activity_at' => now()->timestamp])
@@ -147,12 +164,47 @@ class SatuDataTest extends TestCase
 
     public function test_rbac_enforcement_and_all_panel_views_render(): void
     {
-        // Guest redirected to login
         $this->get(route('panel.ringkasan'))->assertRedirect(route('login'));
 
         $produsen = User::query()->where('nim', '1462200031')->firstOrFail();
         $wali = User::query()->where('nim', 'walidata')->firstOrFail();
         $admin = User::query()->where('nim', 'admin')->firstOrFail();
+        $cat = Category::query()->firstOrFail();
+
+        $sampleForm = DataForm::create([
+            'code' => 'F-RBAC-01',
+            'id_kategori' => $cat->id,
+            'judul' => 'Formulir RBAC',
+            'deskripsi' => 'Uji akses',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Semua',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'dibuat_oleh' => $admin->id,
+        ]);
+        $sampleForm->syncFields([['id' => 'q1', 'label' => 'Pertanyaan', 'type' => 'text', 'required' => true]]);
+
+        $sampleDataset = Dataset::create([
+            'code' => 'DS-RBAC-01',
+            'id_kategori' => $cat->id,
+            'id_formulir_sumber' => $sampleForm->id,
+            'judul' => 'Dataset RBAC',
+            'deskripsi' => 'Uji akses dataset',
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'tipe_akses' => 'public',
+            'status_publikasi' => 'terpublikasi',
+            'format' => 'CSV',
+            'kolom' => ['Kolom', 'Jumlah'],
+            'baris' => [['A', 1]],
+            'dibuat_oleh' => $admin->id,
+        ]);
+
+        $this->assertTrue($admin->hasPermission('preprocessing_data'));
+        $this->assertTrue($wali->hasPermission('preprocessing_data'));
+        $this->assertFalse($wali->hasPermission('kelola_pengguna'));
+        $this->assertTrue($produsen->hasPermission('isi_formulir'));
 
         // Produsen access
         $this->actingAs($produsen)->get(route('panel.ringkasan'))->assertStatus(200);
@@ -161,6 +213,7 @@ class SatuDataTest extends TestCase
 
         foreach ([
             route('panel.formulir'),
+            route('panel.preprocessing'),
             route('panel.data'),
             route('panel.kategori'),
             route('panel.dataset'),
@@ -176,7 +229,8 @@ class SatuDataTest extends TestCase
         $this->actingAs($wali)->get(route('panel.ringkasan'))->assertStatus(200);
         $this->actingAs($wali)->get(route('panel.riwayat'))->assertStatus(200);
         $this->actingAs($wali)->get(route('panel.formulir'))->assertStatus(200);
-        $this->actingAs($wali)->get(route('panel.data'))->assertStatus(200);
+        $this->actingAs($wali)->get(route('panel.preprocessing'))->assertStatus(200);
+        $this->actingAs($wali)->get(route('panel.data'))->assertRedirect(route('panel.preprocessing'));
         $this->actingAs($wali)->get(route('panel.kategori'))->assertStatus(200);
         $this->actingAs($wali)->get(route('panel.dataset'))->assertStatus(200);
         $this->actingAs($wali)->get(route('panel.visualisasi'))->assertStatus(200);
@@ -189,19 +243,16 @@ class SatuDataTest extends TestCase
         $this->actingAs($wali)->get(route('panel.pengguna'))->assertStatus(403);
         $this->actingAs($wali)->get(route('panel.konten'))->assertStatus(403);
 
-        $sampleForm = DataForm::query()->firstOrFail();
-        $sampleCat = Category::query()->firstOrFail();
-        $sampleDataset = Dataset::query()->firstOrFail();
-
         $this->actingAs($wali)->delete(route('panel.formulir.destroy', $sampleForm->code))->assertStatus(403);
-        $this->actingAs($wali)->delete(route('panel.kategori.destroy', $sampleCat->id))->assertStatus(403);
+        $this->actingAs($wali)->delete(route('panel.kategori.destroy', $cat->id))->assertStatus(403);
         $this->actingAs($wali)->delete(route('panel.dataset.destroy', $sampleDataset->code))->assertStatus(403);
 
-        // Admin access across all permitted routes & kontentabs
+        // Admin access (includes form builder, isi formulir, pre-processing, dataset, admin panels)
         $this->actingAs($admin)->get(route('panel.ringkasan'))->assertStatus(200);
         $this->actingAs($admin)->get(route('panel.riwayat'))->assertStatus(200);
         $this->actingAs($admin)->get(route('panel.formulir'))->assertStatus(200);
-        $this->actingAs($admin)->get(route('panel.data'))->assertStatus(200);
+        $this->actingAs($admin)->get(route('panel.isi'))->assertStatus(200);
+        $this->actingAs($admin)->get(route('panel.preprocessing'))->assertStatus(200);
         $this->actingAs($admin)->get(route('panel.kategori'))->assertStatus(200);
         $this->actingAs($admin)->get(route('panel.dataset'))->assertStatus(200);
         $this->actingAs($admin)->get(route('panel.visualisasi'))->assertStatus(200);
@@ -211,227 +262,313 @@ class SatuDataTest extends TestCase
         foreach (['profil', 'dosen', 'prestasi', 'berita', 'kurikulum'] as $tab) {
             $this->actingAs($admin)->get(route('panel.konten', ['tab' => $tab]))->assertStatus(200);
         }
-
-        $this->actingAs($admin)->get(route('panel.isi'))->assertStatus(403);
     }
 
-    public function test_produsen_multipart_form_submission_attachment_download_and_deadline_guard(): void
+    public function test_gform_creation_submission_radio_checkbox_single_response_limit_and_attachment(): void
     {
         Storage::fake('local');
 
-        $admin = User::query()->where('nim', 'admin')->firstOrFail();
         $wali = User::query()->where('nim', 'walidata')->firstOrFail();
         $mhs1 = User::query()->where('nim', '1462200031')->firstOrFail();
-        $mhs2 = User::factory()->create([
-            'code' => 'U-MHS-OTHER',
-            'name' => 'Mahasiswa Lain',
-            'nim' => '1462200099',
-            'role' => 'produsen',
-            'jenis' => 'Mahasiswa',
-            'password' => Hash::make('mhs123'),
-            'aktif' => true,
-        ]);
+        $mhs2 = User::query()->where('nim', '1462300012')->firstOrFail();
         $category = Category::query()->firstOrFail();
 
-        $openForm = DataForm::create([
-            'code' => 'F-TEST-OPEN',
+        // Step 1: Wali Data creates a Google-Forms-style instrument with radio, checkbox, file & single-response limit
+        $fieldsJson = json_encode([
+            ['id' => 'judul', 'label' => 'Judul Kegiatan', 'help' => 'Isi sesuai sertifikat resmi', 'type' => 'text', 'required' => true],
+            ['id' => 'tingkat', 'label' => 'Tingkat', 'help' => '', 'type' => 'radio', 'required' => true, 'options' => ['Regional', 'Nasional']],
+            ['id' => 'peran', 'label' => 'Peran Tim', 'help' => 'Boleh lebih dari satu', 'type' => 'checkbox', 'required' => true, 'options' => ['Ketua', 'Analis Data', 'UI/UX']],
+            ['id' => 'poin', 'label' => 'Poin Capaian', 'help' => '', 'type' => 'number', 'required' => true],
+            ['id' => 'bukti', 'label' => 'Bukti PDF', 'help' => 'Unggah berkas PDF', 'type' => 'file', 'required' => true],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->actingAs($wali)->post(route('panel.formulir.store'), [
+            'title' => 'Pendataan Rekognisi Mahasiswa 2026',
+            'description' => 'Formulir GForm mahasiswa',
             'category_id' => $category->id,
-            'title' => 'Formulir Uji Lampiran',
-            'description' => 'Pengujian submit multipart',
-            'tahun' => 2026,
-            'periode' => 'Genap',
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
             'target' => 'Mahasiswa',
-            'deadline' => now()->addDays(7),
-            'fields' => [
-                ['id' => 'judul', 'label' => 'Judul Kegiatan', 'type' => 'text', 'required' => true],
-                ['id' => 'poin', 'label' => 'Poin', 'type' => 'number', 'required' => true],
-                ['id' => 'bukti', 'label' => 'Bukti PDF', 'type' => 'file', 'required' => true],
-            ],
-            'created_by' => $admin->id,
-        ]);
+            'batasi_satu_respon' => '1',
+            'deadline' => now()->addDays(7)->format('Y-m-d\TH:i'),
+            'fields_json' => $fieldsJson,
+        ])->assertRedirect(route('panel.formulir'))
+            ->assertSessionHas('success', 'Formulir Berhasil Dibuat');
 
-        $pdf = UploadedFile::fake()->create('sertifikat-lomba.pdf', 120, 'application/pdf');
+        $form = DataForm::query()->where('judul', 'Pendataan Rekognisi Mahasiswa 2026')->firstOrFail();
+        $this->assertTrue($form->batasi_satu_respon);
+        $this->assertSame('belum', $form->status_preprocessing);
+        $this->assertSame(5, $form->kolomFormulir()->count());
 
-        $res = $this->actingAs($mhs1)->post(route('panel.isi.submit', $openForm->code), [
+        // Step 2: Public dedicated GForm route /formulir/{code}
+        $this->actingAs($mhs1)
+            ->get(route('formulir.show', $form->code))
+            ->assertStatus(200)
+            ->assertSee('Isi sesuai sertifikat resmi', false)
+            ->assertSee('type="radio"', false)
+            ->assertSee('type="checkbox"', false);
+
+        $pdf = UploadedFile::fake()->create('sertifikat.pdf', 100, 'application/pdf');
+
+        $res = $this->actingAs($mhs1)->post(route('panel.isi.submit', $form->code), [
             'values' => [
-                'judul' => 'Juara Lomba Data',
+                'judul' => 'Gemastik   Data Mining',
+                'tingkat' => 'Nasional',
+                'peran' => ['Ketua', 'Analis Data'],
                 'poin' => '100',
             ],
-            'files' => [
-                'bukti' => $pdf,
-            ],
+            'files' => ['bukti' => $pdf],
         ]);
-
         $res->assertRedirect();
-        $res->assertSessionHas('success', 'Formulir Berhasil Disimpan');
+        $this->assertStringContainsString('Formulir Berhasil Disimpan', (string) session('success'));
 
-        $submission = FormSubmission::query()
-            ->where('data_form_id', $openForm->id)
-            ->where('user_id', $mhs1->id)
-            ->firstOrFail();
+        $sub = FormSubmission::query()->where('id_formulir', $form->id)->where('diisi_oleh', $mhs1->id)->firstOrFail();
+        $this->assertSame('mentah', $sub->status_validasi);
+        $this->assertSame('formulir', $sub->sumber_input);
+        $this->assertSame('Ketua, Analis Data', $sub->values['peran']);
+        $this->assertSame('proses', $form->fresh()->status_preprocessing);
 
-        $storedPath = $submission->attachments['bukti'] ?? '';
-        $this->assertNotSame('', $storedPath);
-        Storage::disk('local')->assertExists($storedPath);
+        // Raw value preserved in nilai_mentah
+        $this->assertSame('Gemastik   Data Mining', $sub->rawValues['judul'] ?? '');
 
-        // Owner & Wali Data can download attachment, other produsen gets 403
-        $this->actingAs($mhs1)
-            ->get(route('panel.submissions.file', [$submission->code, 'bukti']))
-            ->assertStatus(200);
+        // Attachments readable only by owner & staff
+        $this->actingAs($mhs1)->get(route('panel.submissions.file', [$sub->code, 'bukti']))->assertStatus(200);
+        $this->actingAs($wali)->get(route('panel.submissions.file', [$sub->code, 'bukti']))->assertStatus(200);
+        $this->actingAs($mhs2)->get(route('panel.submissions.file', [$sub->code, 'bukti']))->assertStatus(403);
 
-        $this->actingAs($wali)
-            ->get(route('panel.submissions.file', [$submission->code, 'bukti']))
-            ->assertStatus(200);
+        // Single-response guard blocks second submission from same account
+        $this->actingAs($mhs1)->postJson(route('panel.isi.submit', $form->code), [
+            'values' => ['judul' => 'Kedua', 'tingkat' => 'Regional', 'peran' => ['Ketua'], 'poin' => '50'],
+        ])->assertStatus(422);
 
-        $this->actingAs($mhs2)
-            ->get(route('panel.submissions.file', [$submission->code, 'bukti']))
-            ->assertStatus(403);
+        // Wali Data toggles form closed and open
+        $this->actingAs($wali)->patch(route('panel.formulir.toggle', $form->code))->assertRedirect();
+        $this->assertFalse($form->fresh()->isOpen());
+        $this->actingAs($mhs2)->postJson(route('panel.isi.submit', $form->code), [
+            'values' => ['judul' => 'Telat'],
+        ])->assertStatus(422);
 
-        // Closed form rejects submissions
-        $closedForm = DataForm::create([
-            'code' => 'F-TEST-CLOSED',
-            'category_id' => $category->id,
-            'title' => 'Formulir Tutup',
-            'description' => 'Sudah lewat tenggat',
-            'tahun' => 2026,
-            'periode' => 'Genap',
-            'target' => 'Mahasiswa',
-            'deadline' => now()->subDay(),
-            'fields' => [
-                ['id' => 'judul', 'label' => 'Judul', 'type' => 'text', 'required' => true],
-            ],
-            'created_by' => $admin->id,
-        ]);
-
-        $this->actingAs($mhs1)
-            ->postJson(route('panel.isi.submit', $closedForm->code), [
-                'values' => ['judul' => 'Telat'],
-            ])
-            ->assertStatus(422);
-
-        $this->assertSame(0, $closedForm->submissions()->count());
+        $this->actingAs($wali)->patch(route('panel.formulir.toggle', $form->code))->assertRedirect();
+        $this->assertTrue($form->fresh()->isOpen());
     }
 
-    public function test_data_quality_cleaning_and_dataset_builder_modes(): void
+    public function test_full_preprocessing_pipeline_gate_and_dataset_builder_modes(): void
     {
         $wali = User::query()->where('nim', 'walidata')->firstOrFail();
-        $mhs = User::query()->where('nim', '1462200031')->firstOrFail();
-        $dosen = User::query()->where('nim', '0712048601')->firstOrFail();
         $category = Category::query()->firstOrFail();
 
         $form = DataForm::create([
-            'code' => 'F-QUALITY-TEST',
-            'category_id' => $category->id,
-            'title' => 'Survey Praktikum SI',
-            'description' => 'Uji kualitas & dataset builder',
+            'code' => 'F-PREPROC-01',
+            'id_kategori' => $category->id,
+            'judul' => 'Pendataan Dana Hibah & Bidang Minat 2026',
+            'deskripsi' => 'Instrumen GForm untuk uji pre-processing',
             'tahun' => 2026,
             'periode' => 'Ganjil',
             'target' => 'Semua',
-            'deadline' => now()->addDays(10),
-            'fields' => [
-                ['id' => 'lab', 'label' => 'Laboratorium', 'type' => 'select', 'required' => true, 'options' => ['Lab Basis Data', 'Lab Jaringan']],
-                ['id' => 'nilai', 'label' => 'Nilai Akhir', 'type' => 'number', 'required' => true],
-            ],
-            'created_by' => $wali->id,
+            'tanggal_waktu' => now()->addDays(10),
+            'status_aktif' => true,
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $form->syncFields([
+            ['id' => 'prodi', 'label' => 'Kelompok Riset', 'type' => 'radio', 'required' => true, 'options' => ['Data Science', 'Sistem Enterprise']],
+            ['id' => 'topik', 'label' => 'Topik', 'type' => 'checkbox', 'required' => true, 'options' => ['BI', 'ERP']],
+            ['id' => 'dana', 'label' => 'Nominal Dana', 'type' => 'number', 'required' => true],
         ]);
 
-        // Dirty submission (non-numeric nilai + invalid whitespace on required field)
-        $dirtySub = FormSubmission::create([
-            'code' => 'S-DIRTY-01',
-            'data_form_id' => $form->id,
-            'user_id' => $mhs->id,
-            'values' => ['lab' => 'Lab Basis Data', 'nilai' => 'sembilan puluh'],
-            'submitted_at' => now()->subHour(),
-        ]);
+        // Import messy CSV export from GForm:
+        // Row 1: older clean duplicate
+        // Row 2: newer messy case, internal spaces & Indonesian currency (kept by deduplication)
+        // Row 3: missing nominal dana
+        // Row 4: valid Sistem Enterprise row
+        $csv = "Timestamp,Kelompok Riset,Topik,Nominal Dana\r\n"
+            ."2026-10-01 09:00,Data Science,\"BI, ERP\",10000000\r\n"
+            ."2026-10-01 09:05,data   science,\"bi,  erp\",Rp 10.000.000\r\n"
+            ."2026-10-01 09:10,Sistem Enterprise,ERP,\r\n"
+            ."2026-10-01 09:15,Sistem Enterprise,BI,20000000\r\n";
 
-        $cleanSub = FormSubmission::create([
-            'code' => 'S-CLEAN-01',
-            'data_form_id' => $form->id,
-            'user_id' => $dosen->id,
-            'values' => ['lab' => 'Lab Jaringan', 'nilai' => '95'],
-            'submitted_at' => now(),
-        ]);
+        $csvFile = UploadedFile::fake()->createWithContent('gform-export.csv', $csv);
+        $this->actingAs($wali)
+            ->post(route('panel.preprocessing.import', $form->code), ['file' => $csvFile])
+            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertSessionHas('success');
 
-        // Dirty guard blocks dataset creation
+        $this->assertSame(4, $form->submissions()->count());
+        $this->assertSame('proses', $form->fresh()->status_preprocessing);
+
+        // GATE CHECK 1: Dataset creation MUST BE BLOCKED before pre-processing finalization
         $this->actingAs($wali)->from(route('panel.dataset'))
             ->post(route('panel.dataset.from-form'), [
                 'form_id' => $form->id,
-                'mode' => 'rekap',
-                'group_field_id' => 'lab',
-                'title' => 'Rekap Lab Gagal',
+                'mode' => 'rinci',
+                'picked_cols' => ['prodi', 'dana'],
+                'title' => 'Dataset Sebelum Pre-processing',
                 'category_id' => $category->id,
-                'tahun' => 2026,
+                'tahun' => '2026',
                 'periode' => 'Ganjil',
                 'access' => 'public',
-                'format' => 'XLSX',
+                'format' => 'CSV',
             ])
             ->assertRedirect(route('panel.dataset'))
             ->assertSessionHas('error');
+        $this->assertDatabaseMissing('dataset', ['judul' => 'Dataset Sebelum Pre-processing']);
 
-        $this->assertDatabaseMissing('datasets', ['title' => 'Rekap Lab Gagal']);
+        // GATE CHECK 2: Finalization MUST FAIL while issues remain (duplicate + missing)
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
+            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertSessionHas('error');
+        $this->assertSame('proses', $form->fresh()->status_preprocessing);
 
-        // Clean dirty submission
-        $this->actingAs($wali)->from(route('panel.data', ['form' => $form->code]))
-            ->put(route('panel.data.submissions.update', $dirtySub->code), [
-                'values' => ['lab' => 'Lab Basis Data', 'nilai' => '90'],
-            ])
-            ->assertRedirect()
+        // Step A: Normalize batch (cleans spaces, radio/checkbox casing, and Rp 10.000.000 -> 10000000)
+        $this->actingAs($wali)->post(route('panel.preprocessing.normalize', $form->code), [
+            'normalize_numbers' => '1',
+            'text_case' => 'none',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        // Step B: Deduplicate (marks 1 duplicate as ditolak)
+        $this->actingAs($wali)->post(route('panel.preprocessing.deduplicate', $form->code), [
+            'scope' => 'same_values',
+            'action' => 'reject',
+        ])->assertRedirect()->assertSessionHas('success');
+        $this->assertSame(1, $form->submissions()->where('status_validasi', 'ditolak')->count());
+
+        // Step C: Impute missing value using mean of remaining active numeric values ((10000000 + 20000000)/2 = 15000000)
+        $this->actingAs($wali)->post(route('panel.preprocessing.impute', $form->code), [
+            'field_code' => 'dana',
+            'strategy' => 'mean',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        // Step D: Finalize pre-processing -> marks 3 active rows valid and status_preprocessing = 'siap'
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
+            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
             ->assertSessionHas('success');
 
-        $dirtySub->refresh();
-        $this->assertSame($wali->id, $dirtySub->cleaned_by);
-        $this->assertNotNull($dirtySub->cleaned_at);
+        $form->refresh();
+        $this->assertTrue($form->isPreprocessed());
+        $this->assertSame(3, $form->submissions()->where('status_validasi', 'valid')->count());
+        $this->assertNotEmpty($form->ringkasan_preprocessing['logs'] ?? []);
 
-        // Collected raw CSV export
-        $csvRes = $this->actingAs($wali)->get(route('panel.data.csv', $form->code));
-        $csvRes->assertStatus(200);
-        $this->assertStringContainsString('text/csv', (string) $csvRes->headers->get('content-type'));
+        // Ensure nilai_mentah was preserved for the kept messy row while nilai was normalized
+        $keptNormalizedSub = FormSubmission::query()
+            ->where('id_formulir', $form->id)
+            ->where('status_validasi', 'valid')
+            ->get()
+            ->first(fn (FormSubmission $s): bool => ($s->rawValues['prodi'] ?? '') === 'data   science');
+        $this->assertNotNull($keptNormalizedSub);
+        $this->assertSame('Data Science', $keptNormalizedSub->values['prodi']);
+        $this->assertSame('10000000', $keptNormalizedSub->values['dana']);
+        $this->assertSame('Rp 10.000.000', $keptNormalizedSub->rawValues['dana']);
 
-        // Build rekap dataset
+        // Build Mode 1: Dataset Rinci as DRAFT with column aliasing & sensitive masking
         $this->actingAs($wali)->post(route('panel.dataset.from-form'), [
             'form_id' => $form->id,
-            'mode' => 'rekap',
-            'group_field_id' => 'lab',
-            'title' => 'Rekap Praktikum SI 2026',
+            'mode' => 'rinci',
+            'picked_cols' => ['_nama', 'prodi', 'topik', 'dana'],
+            'col_aliases' => ['_nama' => 'Responden', 'dana' => 'Dana Disetujui'],
+            'masked_cols' => ['_nama'],
+            'title' => 'Data Rinci Hibah Riset 2026',
             'category_id' => $category->id,
-            'tahun' => 2026,
+            'tahun' => '2026',
             'periode' => 'Ganjil',
             'access' => 'public',
+            'publish_status' => 'draft',
             'format' => 'XLSX',
         ])->assertRedirect(route('panel.dataset'))
             ->assertSessionHas('success');
 
-        $rekapDataset = Dataset::query()->where('title', 'Rekap Praktikum SI 2026')->firstOrFail();
-        $this->assertSame(['Laboratorium', 'Jumlah'], $rekapDataset->cols);
-        $this->assertCount(2, $rekapDataset->rows);
+        $rinci = Dataset::query()->where('judul', 'Data Rinci Hibah Riset 2026')->firstOrFail();
+        $this->assertSame('draft', $rinci->status_publikasi);
+        $this->assertSame(['Responden', 'Kelompok Riset', 'Topik', 'Dana Disetujui'], $rinci->kolom);
+        $this->assertCount(3, $rinci->baris);
+        $this->assertStringStartsWith('Responden #', (string) $rinci->baris[0][0]);
 
-        // Build rinci dataset
+        // Draft datasets are hidden from public catalog & preview
+        $this->post(route('logout'));
+        $this->get(route('dataset'))->assertDontSee('Data Rinci Hibah Riset 2026', false);
+        $this->get(route('dataset.preview', $rinci->code))->assertStatus(403);
+
+        // Publish draft dataset -> now visible on public catalog
+        $this->actingAs($wali)->patchJson(route('panel.dataset.publish', $rinci->code), [
+            'status_publikasi' => 'terpublikasi',
+        ])->assertStatus(200)->assertJsonPath('status_publikasi', 'terpublikasi');
+
+        $this->post(route('logout'));
+        $this->get(route('dataset'))->assertStatus(200)->assertSee('Data Rinci Hibah Riset 2026', false);
+
+        // Build Mode 2: Dataset Rekap with SUM aggregation per Kelompok Riset (Data Science: 10M, Sistem Enterprise: 35M)
         $this->actingAs($wali)->post(route('panel.dataset.from-form'), [
             'form_id' => $form->id,
-            'mode' => 'rinci',
-            'picked_cols' => ['_nama', 'lab', 'nilai'],
-            'title' => 'Rinci Praktikum SI 2026',
+            'mode' => 'rekap',
+            'group_field_id' => 'prodi',
+            'agg_func' => 'sum',
+            'agg_field_id' => 'dana',
+            'title' => 'Total Dana Hibah per Kelompok Riset 2026',
             'category_id' => $category->id,
-            'tahun' => 2026,
+            'tahun' => '2026',
             'periode' => 'Ganjil',
-            'access' => 'private',
+            'access' => 'public',
+            'publish_status' => 'terpublikasi',
             'format' => 'CSV',
         ])->assertRedirect(route('panel.dataset'))
             ->assertSessionHas('success');
 
-        $rinciDataset = Dataset::query()->where('title', 'Rinci Praktikum SI 2026')->firstOrFail();
-        $this->assertSame(['Nama pengirim', 'Laboratorium', 'Nilai Akhir'], $rinciDataset->cols);
-        $this->assertCount(2, $rinciDataset->rows);
-        $this->assertSame('private', $rinciDataset->access);
+        $rekap = Dataset::query()->where('judul', 'Total Dana Hibah per Kelompok Riset 2026')->firstOrFail();
+        $this->assertSame(['Kelompok Riset', 'Total Nominal Dana'], $rekap->kolom);
+        $rowsAssoc = collect($rekap->baris)->mapWithKeys(fn (array $r): array => [(string) $r[0] => $r[1]])->all();
+        $this->assertSame(10000000, $rowsAssoc['Data Science']);
+        $this->assertSame(35000000, $rowsAssoc['Sistem Enterprise']);
+
+        // Also verify Re-sync when new XLSX submission arrives & completes pre-processing
+        $exporter = app(SpreadsheetExportService::class);
+        $xlsxRes = $exporter->downloadXlsx('extra-row', ['Kelompok Riset', 'Topik', 'Nominal Dana'], [['Data Science', 'BI', '5000000']]);
+        $xlsxFile = UploadedFile::fake()->createWithContent('extra.xlsx', (string) $xlsxRes->getContent());
+
+        $this->actingAs($wali)->post(route('panel.preprocessing.import', $form->code), ['file' => $xlsxFile])->assertRedirect();
+        $this->assertSame('proses', $form->fresh()->status_preprocessing);
+
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))->assertRedirect()->assertSessionHas('success');
+        $this->actingAs($wali)->post(route('panel.dataset.sync', $rekap->code))->assertRedirect(route('panel.dataset'))->assertSessionHas('success');
+
+        $rekap->refresh();
+        $syncedAssoc = collect($rekap->baris)->mapWithKeys(fn (array $r): array => [(string) $r[0] => $r[1]])->all();
+        $this->assertSame(15000000, $syncedAssoc['Data Science']);
+        $this->assertSame(35000000, $syncedAssoc['Sistem Enterprise']);
     }
 
     public function test_private_dataset_request_approval_rejection_and_csv_xlsx_downloads(): void
     {
         $wali = User::query()->where('nim', 'walidata')->firstOrFail();
-        $publicDs = Dataset::query()->where('access', 'public')->firstOrFail();
-        $privateDs = Dataset::query()->where('access', 'private')->firstOrFail();
+        $cat = Category::query()->firstOrFail();
 
-        // Public dataset is directly downloadable as CSV & valid OOXML XLSX
+        $publicDs = Dataset::create([
+            'code' => 'DS-PUB-01',
+            'id_kategori' => $cat->id,
+            'judul' => 'Dataset Publik Uji',
+            'deskripsi' => 'Publik',
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'tipe_akses' => 'public',
+            'status_publikasi' => 'terpublikasi',
+            'format' => 'XLSX',
+            'kolom' => ['Kategori', 'Total'],
+            'baris' => [['Akademik', 42], ['Riset', 18]],
+            'dibuat_oleh' => $wali->id,
+        ]);
+
+        $privateDs = Dataset::create([
+            'code' => 'DS-PRIV-01',
+            'id_kategori' => $cat->id,
+            'judul' => 'Dataset Private Uji',
+            'deskripsi' => 'Khusus disetujui',
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'tipe_akses' => 'private',
+            'status_publikasi' => 'terpublikasi',
+            'format' => 'XLSX',
+            'kolom' => ['Nama', 'Nilai'],
+            'baris' => [['Ahmad', 95]],
+            'dibuat_oleh' => $wali->id,
+        ]);
+
         $this->get(route('dataset.preview', $publicDs->code))
             ->assertStatus(200)
             ->assertJsonPath('id', $publicDs->code);
@@ -448,7 +585,7 @@ class SatuDataTest extends TestCase
         $this->assertNotFalse($xlsxPath);
         file_put_contents($xlsxPath, $xlsxBytes);
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $opened = $zip->open($xlsxPath);
         $this->assertTrue($opened === true, 'XLSX harus valid ZipArchive.');
         $this->assertNotFalse($zip->locateName('xl/workbook.xml'));
@@ -456,12 +593,10 @@ class SatuDataTest extends TestCase
         $zip->close();
         @unlink($xlsxPath);
 
-        // Guest blocked from private dataset before approval
         $this->get(route('dataset.preview', $privateDs->code))->assertStatus(403);
         $this->get(route('dataset.download', [$privateDs->code, 'csv']))->assertStatus(403);
         $this->get(route('dataset.download', [$privateDs->code, 'xlsx']))->assertStatus(403);
 
-        // Request 1 -> rejected (first verify rejecting without note fails validation)
         $req1Res = $this->postJson(route('dataset.request', $privateDs->code), [
             'nama' => 'Pemohon Pertama',
             'email' => 'pemohon1@student.unusa.ac.id',
@@ -473,7 +608,6 @@ class SatuDataTest extends TestCase
         $req1Res->assertStatus(201);
         $req1Code = (string) $req1Res->json('request.id');
 
-        // Reject without note -> validation error
         $this->actingAs($wali)->from(route('panel.permohonan'))
             ->post(route('panel.permohonan.decide', $req1Code), [
                 'status' => 'ditolak',
@@ -482,20 +616,16 @@ class SatuDataTest extends TestCase
             ->assertRedirect(route('panel.permohonan'))
             ->assertSessionHasErrors('note');
 
-        // Reject with note -> rejected, guest session still blocked (403)
         $this->actingAs($wali)->post(route('panel.permohonan.decide', $req1Code), [
             'status' => 'ditolak',
             'note' => 'Dokumen surat izin belum dilampirkan.',
         ])->assertRedirect(route('panel.permohonan', ['tab' => 'menunggu']));
 
-        // Reset auth back to guest and verify rejected request stays blocked (403)
         $this->post(route('logout'));
 
         $this->withSession(['my_request_codes' => [$req1Code]])
             ->get(route('dataset.preview', $privateDs->code))
             ->assertStatus(403);
-
-        // Submit Request 2 as guest -> approved
 
         $req2Res = $this->postJson(route('dataset.request', $privateDs->code), [
             'nama' => 'Pemohon Kedua',
@@ -516,7 +646,6 @@ class SatuDataTest extends TestCase
 
         $this->assertSame('disetujui', DataRequest::query()->where('code', $req2Code)->value('status'));
 
-        // Guest with approved session request code now has preview & downloads
         $this->post(route('logout'));
         $guestWithApprovedSession = $this->withSession(['my_request_codes' => [$req2Code]]);
 
@@ -536,19 +665,29 @@ class SatuDataTest extends TestCase
         $wali1 = User::query()->where('nim', 'walidata')->firstOrFail();
         $wali2 = User::factory()->create([
             'code' => 'U-WALI-2',
-            'name' => 'Wali Data Kedua',
+            'nama_pengguna' => 'Wali Data Kedua',
             'nim' => 'walidata2',
-            'role' => 'wali',
-            'password' => Hash::make('wali123'),
+            'id_peran' => User::resolveRoleId('wali'),
+            'jenis' => null,
+            'kata_sandi' => Hash::make('wali123'),
             'aktif' => true,
         ]);
+        $cat = Category::query()->firstOrFail();
 
-        $publicDs = Dataset::query()->where('access', 'public')->get()->first(
-            fn (Dataset $d): bool => ! empty($d->numericColumns())
-        );
-        $this->assertNotNull($publicDs);
-        $numericCols = $publicDs->numericColumns();
-        $valueCol = (int) array_key_first($numericCols);
+        $publicDs = Dataset::create([
+            'code' => 'DS-VIZ-01',
+            'id_kategori' => $cat->id,
+            'judul' => 'Dataset Sumber Grafik 2026',
+            'deskripsi' => 'Untuk uji visualisasi',
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'tipe_akses' => 'public',
+            'status_publikasi' => 'terpublikasi',
+            'format' => 'CSV',
+            'kolom' => ['Skema', 'Jumlah'],
+            'baris' => [['Internal', 10], ['Dikti', 6]],
+            'dibuat_oleh' => $wali1->id,
+        ]);
 
         $title = 'Visualisasi Uji Dinamis 2026';
 
@@ -556,48 +695,43 @@ class SatuDataTest extends TestCase
             'title' => $title,
             'dataset_id' => $publicDs->id,
             'label_col' => 0,
-            'value_col' => $valueCol,
+            'value_col' => 1,
             'kind' => 'bar',
             'color' => 'sky',
             'show' => '1',
         ])->assertRedirect(route('panel.visualisasi'))
             ->assertSessionHas('success');
 
-        $viz = Visualization::query()->where('title', $title)->firstOrFail();
+        $viz = Visualization::query()->where('judul', $title)->firstOrFail();
         $this->assertTrue($viz->show);
 
-        // Appears on public Dashboard
         $this->get('/dashboard')->assertStatus(200)->assertSee($title, false);
 
-        // Toggle visibility off
         $this->actingAs($wali1)->patchJson(route('panel.visualisasi.toggle', $viz->code), ['show' => false])
             ->assertStatus(200)
             ->assertJsonPath('show', false);
 
         $this->get('/dashboard')->assertStatus(200)->assertDontSee($title, false);
 
-        // Non-creator wali cannot delete another wali's visualization
         $this->actingAs($wali2)->delete(route('panel.visualisasi.destroy', $viz->code))
             ->assertStatus(403);
 
-        // Creator wali can delete own visualization
         $this->actingAs($wali1)->delete(route('panel.visualisasi.destroy', $viz->code))
             ->assertRedirect(route('panel.visualisasi'))
             ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('visualizations', ['id' => $viz->id]);
+        $this->assertDatabaseMissing('visualisasi_dashboard', ['id' => $viz->id]);
     }
 
     public function test_admin_crud_and_self_or_dependency_guards(): void
     {
         $admin = User::query()->where('nim', 'admin')->firstOrFail();
 
-        // Self delete / self demote blocked
         $this->actingAs($admin)->from(route('panel.pengguna'))
             ->delete(route('panel.pengguna.destroy', $admin->id))
             ->assertRedirect(route('panel.pengguna'))
             ->assertSessionHas('error');
-        $this->assertDatabaseHas('users', ['id' => $admin->id]);
+        $this->assertDatabaseHas('pengguna', ['id' => $admin->id]);
 
         $this->actingAs($admin)->from(route('panel.pengguna'))
             ->put(route('panel.pengguna.update', $admin->id), [
@@ -611,7 +745,6 @@ class SatuDataTest extends TestCase
             ->assertSessionHas('error');
         $this->assertSame('admin', $admin->fresh()->role);
 
-        // Create, update, delete user
         $this->actingAs($admin)->post(route('panel.pengguna.store'), [
             'name' => 'Pengguna Baru Uji',
             'nim' => '1462200888',
@@ -635,15 +768,29 @@ class SatuDataTest extends TestCase
 
         $this->actingAs($admin)->delete(route('panel.pengguna.destroy', $createdUser->id))
             ->assertRedirect(route('panel.pengguna'));
-        $this->assertDatabaseMissing('users', ['id' => $createdUser->id]);
+        $this->assertDatabaseMissing('pengguna', ['id' => $createdUser->id]);
 
-        // Category in use cannot be deleted; unused category can be created and deleted
-        $usedCat = Category::query()->whereHas('datasets')->firstOrFail();
+        $usedCat = Category::query()->firstOrFail();
+        Dataset::create([
+            'code' => 'DS-CAT-GUARD',
+            'id_kategori' => $usedCat->id,
+            'judul' => 'Penjaga Kategori',
+            'deskripsi' => 'Uji relasi kategori',
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'tipe_akses' => 'public',
+            'status_publikasi' => 'terpublikasi',
+            'format' => 'CSV',
+            'kolom' => ['A'],
+            'baris' => [['1']],
+            'dibuat_oleh' => $admin->id,
+        ]);
+
         $this->actingAs($admin)->from(route('panel.kategori'))
             ->delete(route('panel.kategori.destroy', $usedCat->id))
             ->assertRedirect(route('panel.kategori'))
             ->assertSessionHas('error');
-        $this->assertDatabaseHas('categories', ['id' => $usedCat->id]);
+        $this->assertDatabaseHas('kategori', ['id' => $usedCat->id]);
 
         $this->actingAs($admin)->post(route('panel.kategori.store'), [
             'code' => 'KT-TEST-99',
@@ -655,9 +802,8 @@ class SatuDataTest extends TestCase
         $this->actingAs($admin)->delete(route('panel.kategori.destroy', $unusedCat->id))
             ->assertRedirect(route('panel.kategori'))
             ->assertSessionHas('success');
-        $this->assertDatabaseMissing('categories', ['id' => $unusedCat->id]);
+        $this->assertDatabaseMissing('kategori', ['id' => $unusedCat->id]);
 
-        // Admin CMS content updates reflect on /, /berita, /tentang-kami
         $this->actingAs($admin)->put(route('panel.konten.profil.update'), [
             'program' => 'S1 Sistem Informasi UNUSA',
             'gelar' => 'Sarjana Komputer (S.Kom.)',
@@ -729,79 +875,43 @@ class SatuDataTest extends TestCase
             ->assertSee('Deskripsi program studi yang telah diperbarui.', false);
     }
 
-    public function test_ami_workbook_data_and_datasets_are_seeded_and_downloadable(): void
+    public function test_dppl_17_tables_and_workflow_columns_exist(): void
     {
-        // Verify decimal & thousand-separator numeric parsing
         $this->assertSame(83.33, ChartPaletteService::parseNumeric('83.33'));
         $this->assertSame(1250.5, ChartPaletteService::parseNumeric('1.250,50'));
         $this->assertSame(1250000.0, ChartPaletteService::parseNumeric('1.250.000'));
 
-        // All 5 normalized AMI tables populated completely
-        $this->assertSame(240, AmiIndicator::query()->count());
-        $this->assertSame(37, AmiStandardSummary::query()->count());
-        $this->assertSame(361, AmiBenchmark::query()->count());
-        $this->assertSame(113, AmiPtkFinding::query()->count());
-        $this->assertSame(4, AmiRecommendation::query()->count());
+        foreach ([
+            'peran',
+            'hak_akses',
+            'peran_hak_akses',
+            'pengguna',
+            'profil_prodi',
+            'berita',
+            'kurikulum',
+            'dosen',
+            'prestasi',
+            'kategori',
+            'formulir',
+            'kolom_formulir',
+            'pengisian_formulir',
+            'data_isian',
+            'dataset',
+            'permohonan_data',
+            'visualisasi_dashboard',
+        ] as $dpplTable) {
+            $this->assertTrue(Schema::hasTable($dpplTable), "Tabel DPPL {$dpplTable} wajib ada.");
+        }
 
-        // Category KT-AMI-01, Form F-05, and Visualizations V-04 & V-05
-        $this->assertDatabaseHas('categories', ['code' => 'KT-AMI-01']);
+        $this->assertTrue(Schema::hasColumns('formulir', ['batasi_satu_respon', 'status_preprocessing', 'ringkasan_preprocessing', 'diproses_oleh', 'waktu_diproses']));
+        $this->assertTrue(Schema::hasColumn('kolom_formulir', 'deskripsi_bantuan'));
+        $this->assertTrue(Schema::hasColumns('pengisian_formulir', ['status_validasi', 'catatan_validasi', 'sumber_input']));
+        $this->assertTrue(Schema::hasColumn('data_isian', 'nilai_mentah'));
+        $this->assertTrue(Schema::hasColumns('dataset', ['status_publikasi', 'konfigurasi_sumber']));
 
-        $amiForm = DataForm::query()->where('code', 'F-05')->firstOrFail();
-        $this->assertSame('Dosen', $amiForm->target);
-
-        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
         $admin = User::query()->where('nim', 'admin')->firstOrFail();
-        $this->actingAs($wali)->get(route('panel.formulir'))
-            ->assertStatus(200)
-            ->assertSee($amiForm->title);
-        $this->actingAs($admin)->get(route('panel.formulir'))
-            ->assertStatus(200)
-            ->assertSee($amiForm->title);
-
-        $vis04 = Visualization::query()->where('code', 'V-04')->firstOrFail();
-        $vis05 = Visualization::query()->where('code', 'V-05')->firstOrFail();
-        $this->assertTrue((bool) $vis04->show);
-        $this->assertTrue((bool) $vis05->show);
-
-        $this->get(route('dashboard'))
-            ->assertStatus(200)
-            ->assertSee($vis04->title, false)
-            ->assertSee($vis05->title, false);
-
-        // Datasets DS-13..DS-22 are public, previewable, and downloadable as CSV
-        for ($i = 13; $i <= 22; $i++) {
-            $code = 'DS-'.$i;
-            $dataset = Dataset::query()->where('code', $code)->firstOrFail();
-
-            $this->assertSame('public', $dataset->access);
-            $this->assertNotEmpty($dataset->rows, "Dataset {$code} harus memiliki baris data.");
-
-            $this->get(route('dataset.preview', $dataset->code))
-                ->assertStatus(200)
-                ->assertJsonPath('id', $dataset->code);
-
-            $csvResponse = $this->get(route('dataset.download', [$dataset->code, 'csv']));
-            $csvResponse->assertStatus(200);
-            $this->assertStringContainsString('text/csv', (string) $csvResponse->headers->get('content-type'));
-        }
-
-        // Verify valid OOXML XLSX export for representative multi-column AMI datasets
-        foreach (['DS-18', 'DS-20'] as $xlsxCode) {
-            $xlsxResponse = $this->get(route('dataset.download', [$xlsxCode, 'xlsx']));
-            $xlsxResponse->assertStatus(200);
-            $xlsxBytes = $xlsxResponse->getContent();
-            $this->assertNotEmpty($xlsxBytes);
-            $xlsxPath = tempnam(sys_get_temp_dir(), 'test_xlsx_');
-            $this->assertNotFalse($xlsxPath);
-            file_put_contents($xlsxPath, $xlsxBytes);
-
-            $zip = new ZipArchive();
-            $opened = $zip->open($xlsxPath);
-            $this->assertTrue($opened === true, "XLSX {$xlsxCode} harus berupa ZipArchive yang valid.");
-            $this->assertNotFalse($zip->locateName('xl/workbook.xml'));
-            $this->assertNotFalse($zip->locateName('xl/worksheets/sheet1.xml'));
-            $zip->close();
-            @unlink($xlsxPath);
-        }
+        $this->actingAs($admin)->post(route('panel.reset-demo'))
+            ->assertRedirect(route('panel.ringkasan'))
+            ->assertSessionHas('success');
     }
 }

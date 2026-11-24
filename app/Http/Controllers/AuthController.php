@@ -42,7 +42,7 @@ class AuthController extends Controller
 
         $user = User::query()->where('nim', $validated['nim'])->first();
 
-        if (! $user || ! Hash::check($validated['password'], $user->password)) {
+        if (! $user || ! Hash::check($validated['password'], $user->kata_sandi)) {
             return back()
                 ->withInput(['nim' => $validated['nim']])
                 ->with('error', 'NIM/NIP atau password salah.');

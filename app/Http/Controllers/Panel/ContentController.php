@@ -24,10 +24,10 @@ class ContentController extends Controller
         }
 
         $profil = ProgramProfile::query()->first();
-        $lecturers = Lecturer::query()->orderBy('sort_order')->orderBy('id')->get();
+        $lecturers = Lecturer::query()->orderBy('urutan')->orderBy('id')->get();
         $achievements = Achievement::query()->orderByDesc('tahun')->orderBy('id')->get();
         $news = NewsArticle::query()->orderByDesc('created_at')->orderBy('id')->get();
-        $courses = Course::query()->orderByDesc('tahun')->orderBy('semester')->orderBy('kode')->get();
+        $courses = Course::query()->orderByDesc('tahun')->orderBy('semester')->orderBy('kode_mk')->get();
 
         $newsTags = NewsArticle::TAGS;
         $jabatanOptions = Lecturer::JABATAN_OPTIONS;
@@ -80,26 +80,31 @@ class ContentController extends Controller
         ));
 
         $payload = [
-            'deskripsi' => trim($validated['deskripsi']),
-            'visi' => trim($validated['visi']),
-            'misi' => $misi,
+            'deskripsi_prodi' => trim($validated['deskripsi']),
+            'visi_misi' => [
+                'visi' => trim($validated['visi']),
+                'misi' => $misi,
+            ],
             'akreditasi' => trim($validated['akreditasi']),
-            'berdiri' => trim((string) ($validated['berdiri'] ?? '')) ?: null,
-            'alamat' => trim((string) ($validated['alamat'] ?? '')) ?: null,
-            'email' => trim($validated['email']),
-            'telp' => trim((string) ($validated['telp'] ?? '')) ?: null,
+            'tahun_berdiri' => trim((string) ($validated['berdiri'] ?? '')) ?: null,
+            'lokasi_kampus' => trim((string) ($validated['alamat'] ?? '')) ?: null,
+            'kontak' => [
+                'email' => trim($validated['email']),
+                'telp' => trim((string) ($validated['telp'] ?? '')) ?: null,
+            ],
             'sejarah' => trim((string) ($validated['sejarah'] ?? '')) ?: null,
-            'program' => trim((string) ($validated['program'] ?? '')) ?: null,
+            'nama_prodi' => trim((string) ($validated['program'] ?? '')) ?: null,
             'gelar' => trim((string) ($validated['gelar'] ?? '')) ?: null,
-            'durasi' => trim((string) ($validated['durasi'] ?? '')) ?: null,
-            'syarat' => trim((string) ($validated['syarat'] ?? '')) ?: null,
+            'durasi_studi' => trim((string) ($validated['durasi'] ?? '')) ?: null,
+            'persyaratan' => trim((string) ($validated['syarat'] ?? '')) ?: null,
             'fakultas' => trim((string) ($validated['fakultas'] ?? '')) ?: null,
             'fasilitas' => trim((string) ($validated['fasilitas'] ?? '')) ?: null,
+            'dikelola_oleh' => $request->user()->id,
         ];
 
         $profil = ProgramProfile::query()->first();
         if ($profil) {
-            $profil->update($payload);
+            $profil->perbaruiProfil($payload);
         } else {
             ProgramProfile::create($payload);
         }
@@ -111,12 +116,13 @@ class ContentController extends Controller
     public function storeLecturer(Request $request): RedirectResponse
     {
         $data = $this->validateLecturer($request);
-        $maxOrder = (int) Lecturer::query()->max('sort_order');
+        $maxOrder = (int) Lecturer::query()->max('urutan');
 
         Lecturer::create([
-            'code' => CodeGenerator::next('D', 'lecturers'),
+            'code' => CodeGenerator::next('D', 'dosen'),
             ...$data,
-            'sort_order' => $maxOrder + 1,
+            'urutan' => $maxOrder + 1,
+            'dikelola_oleh' => $request->user()->id,
         ]);
 
         return redirect()->route('panel.konten', ['tab' => 'dosen'])
@@ -125,7 +131,10 @@ class ContentController extends Controller
 
     public function updateLecturer(Request $request, Lecturer $lecturer): RedirectResponse
     {
-        $lecturer->update($this->validateLecturer($request));
+        $lecturer->update([
+            ...$this->validateLecturer($request),
+            'dikelola_oleh' => $request->user()->id,
+        ]);
 
         return redirect()->route('panel.konten', ['tab' => 'dosen'])
             ->with('success', 'Data dosen disimpan.');
@@ -144,8 +153,9 @@ class ContentController extends Controller
         $data = $this->validateAchievement($request);
 
         Achievement::create([
-            'code' => CodeGenerator::next('P', 'achievements'),
+            'code' => CodeGenerator::next('P', 'prestasi'),
             ...$data,
+            'dikelola_oleh' => $request->user()->id,
         ]);
 
         return redirect()->route('panel.konten', ['tab' => 'prestasi'])
@@ -154,7 +164,10 @@ class ContentController extends Controller
 
     public function updateAchievement(Request $request, Achievement $achievement): RedirectResponse
     {
-        $achievement->update($this->validateAchievement($request));
+        $achievement->update([
+            ...$this->validateAchievement($request),
+            'dikelola_oleh' => $request->user()->id,
+        ]);
 
         return redirect()->route('panel.konten', ['tab' => 'prestasi'])
             ->with('success', 'Prestasi disimpan.');
@@ -173,8 +186,9 @@ class ContentController extends Controller
         $data = $this->validateNews($request);
 
         NewsArticle::create([
-            'code' => CodeGenerator::next('B', 'news_articles'),
+            'code' => CodeGenerator::next('B', 'berita'),
             ...$data,
+            'dikelola_oleh' => $request->user()->id,
         ]);
 
         return redirect()->route('panel.konten', ['tab' => 'berita'])
@@ -183,7 +197,10 @@ class ContentController extends Controller
 
     public function updateNews(Request $request, NewsArticle $newsArticle): RedirectResponse
     {
-        $newsArticle->update($this->validateNews($request));
+        $newsArticle->update([
+            ...$this->validateNews($request),
+            'dikelola_oleh' => $request->user()->id,
+        ]);
 
         return redirect()->route('panel.konten', ['tab' => 'berita'])
             ->with('success', 'Berita disimpan dan tampil di Beranda & Berita.');
@@ -202,8 +219,9 @@ class ContentController extends Controller
         $data = $this->validateCourse($request);
 
         Course::create([
-            'code' => CodeGenerator::next('MK', 'courses'),
+            'code' => CodeGenerator::next('MK', 'kurikulum'),
             ...$data,
+            'dikelola_oleh' => $request->user()->id,
         ]);
 
         return redirect()->route('panel.konten', ['tab' => 'kurikulum'])
@@ -212,7 +230,10 @@ class ContentController extends Controller
 
     public function updateCourse(Request $request, Course $course): RedirectResponse
     {
-        $course->update($this->validateCourse($request, $course));
+        $course->update([
+            ...$this->validateCourse($request, $course),
+            'dikelola_oleh' => $request->user()->id,
+        ]);
 
         return redirect()->route('panel.konten', ['tab' => 'kurikulum'])
             ->with('success', 'Mata kuliah disimpan.');
@@ -253,7 +274,7 @@ class ContentController extends Controller
             'pendidikan' => $validated['pendidikan'],
             'jabatan' => $validated['jabatan'],
             'bidang' => trim($validated['bidang']),
-            'foto' => trim((string) ($validated['foto'] ?? '')) ?: null,
+            'jalur_foto' => trim((string) ($validated['foto'] ?? '')) ?: null,
             'email' => trim((string) ($validated['email'] ?? '')) ?: null,
             'mata_kuliah' => trim((string) ($validated['mata_kuliah'] ?? '')) ?: null,
             'profil' => trim((string) ($validated['profil'] ?? '')) ?: null,
@@ -279,11 +300,11 @@ class ContentController extends Controller
 
         return [
             'judul' => trim($validated['judul']),
-            'nama' => trim($validated['nama']),
+            'nama_peraih' => trim($validated['nama']),
             'tingkat' => $validated['tingkat'],
             'peringkat' => trim($validated['peringkat']),
             'tahun' => (int) $validated['tahun'],
-            'foto' => trim((string) ($validated['foto'] ?? '')) ?: null,
+            'jalur_gambar' => trim((string) ($validated['foto'] ?? '')) ?: null,
         ];
     }
 
@@ -313,16 +334,17 @@ class ContentController extends Controller
         ));
 
         return [
-            'title' => trim($validated['title']),
-            'badge' => $validated['badge'],
-            'corner' => trim((string) ($validated['corner'] ?? '')) ?: null,
-            'date_label' => trim($validated['date_label']),
-            'author' => $author,
-            'author_initials' => NewsArticle::makeInitials($author),
-            'read_minutes' => (int) $validated['read_minutes'],
-            'image_url' => trim($validated['image_url']),
-            'excerpt' => trim($validated['excerpt']),
-            'body' => $paragraphs,
+            'judul' => trim($validated['title']),
+            'kategori_badge' => $validated['badge'],
+            'label_pojok' => trim((string) ($validated['corner'] ?? '')) ?: null,
+            'label_tanggal' => trim($validated['date_label']),
+            'tanggal_publikasi' => now()->toDateString(),
+            'penulis' => $author,
+            'inisial_penulis' => NewsArticle::makeInitials($author),
+            'menit_baca' => (int) $validated['read_minutes'],
+            'jalur_gambar' => trim($validated['image_url']),
+            'ringkasan' => trim($validated['excerpt']),
+            'isi_berita' => $paragraphs,
         ];
     }
 
@@ -345,11 +367,11 @@ class ContentController extends Controller
         ]);
 
         $kode = trim($validated['kode']);
-        $tahun = (int) $validated['tahun'];
+        $tahun = (string) $validated['tahun'];
 
         $duplicate = Course::query()
             ->where('tahun', $tahun)
-            ->whereRaw('LOWER(kode) = ?', [strtolower($kode)])
+            ->whereRaw('LOWER(kode_mk) = ?', [strtolower($kode)])
             ->when($ignore, fn ($q) => $q->where('id', '!=', $ignore->id))
             ->exists();
 
@@ -360,8 +382,8 @@ class ContentController extends Controller
         }
 
         return [
-            'kode' => $kode,
-            'nama' => trim($validated['nama']),
+            'kode_mk' => $kode,
+            'nama_mk' => trim($validated['nama']),
             'tahun' => $tahun,
             'semester' => (int) $validated['semester'],
             'sks' => (int) $validated['sks'],

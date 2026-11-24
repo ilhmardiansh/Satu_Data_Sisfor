@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Models\DataForm;
 use App\Models\FormSubmission;
+use App\Services\DataPreprocessingService;
 use App\Services\DataQualityService;
 use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
@@ -18,23 +20,58 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FormSubmissionController extends Controller
 {
+    public function showPublicForm(DataForm $dataForm): View
+    {
+        $dataForm->loadMissing(['category', 'kolomFormulir']);
+        $user = Auth::user();
+        $alreadySubmittedCount = $user
+            ? FormSubmission::query()
+                ->where('id_formulir', $dataForm->id)
+                ->where('diisi_oleh', $user->id)
+                ->count()
+            : 0;
+
+        $closedReason = null;
+        $canSubmit = false;
+
+        if (! $user) {
+            $closedReason = 'Masuk terlebih dahulu dengan akun Produsen Data atau Admin untuk mengisi formulir ini.';
+        } elseif (! ($user->isProdusen() || $user->isAdmin())) {
+            $closedReason = 'Wali Data tidak mengisi instrumen secara langsung. Gunakan menu Pre-processing Data untuk meninjau respons.';
+        } elseif (! $dataForm->canBeSeenBy($user)) {
+            $closedReason = "Formulir ini khusus ditujukan untuk responden kategori {$dataForm->target}.";
+        } elseif (! $dataForm->isOpen()) {
+            $closedReason = 'Formulir telah ditutup atau melewati tenggat waktu pengumpulan.';
+        } elseif ($dataForm->batasi_satu_respon && $alreadySubmittedCount > 0) {
+            $closedReason = 'Anda sudah mengirimkan respons pada formulir ini (dibatasi 1 respons per akun).';
+        } else {
+            $canSubmit = true;
+        }
+
+        return view('pages.formulir-isi', compact(
+            'dataForm',
+            'alreadySubmittedCount',
+            'canSubmit',
+            'closedReason'
+        ));
+    }
+
     public function index(): View
     {
         $user = Auth::user();
 
-        $forms = DataForm::query()
-            ->with('category')
-            ->where('deadline', '>', now())
-            ->orderBy('deadline')
+        $forms = DataForm::open()
+            ->with(['category', 'kolomFormulir'])
+            ->orderBy('tanggal_waktu')
             ->get()
             ->filter(fn (DataForm $form): bool => $form->canBeSeenBy($user))
             ->values();
 
         $myCounts = FormSubmission::query()
-            ->where('user_id', $user->id)
-            ->selectRaw('data_form_id, COUNT(*) as total')
-            ->groupBy('data_form_id')
-            ->pluck('total', 'data_form_id')
+            ->where('diisi_oleh', $user->id)
+            ->selectRaw('id_formulir, COUNT(*) as total')
+            ->groupBy('id_formulir')
+            ->pluck('total', 'id_formulir')
             ->all();
 
         return view('panel.isi', compact('forms', 'myCounts'));
@@ -43,12 +80,13 @@ class FormSubmissionController extends Controller
     public function store(
         Request $request,
         DataForm $dataForm,
-        DataQualityService $quality
+        DataQualityService $quality,
+        DataPreprocessingService $preprocessing
     ): JsonResponse|RedirectResponse {
         $user = $request->user();
 
-        if (! $user || ! $user->isProdusen()) {
-            $msg = 'Hanya Produsen Data yang dapat mengisi formulir.';
+        if (! $user || (! $user->isProdusen() && ! $user->isAdmin())) {
+            $msg = 'Hanya Produsen Data atau Admin yang dapat mengisi formulir.';
             if ($request->expectsJson()) {
                 return response()->json(['message' => $msg], 403);
             }
@@ -74,14 +112,24 @@ class FormSubmissionController extends Controller
             return back()->with('error', $msg);
         }
 
+        if ($dataForm->batasi_satu_respon && $dataForm->submissions()->where('diisi_oleh', $user->id)->exists()) {
+            $msg = 'Formulir ini dibatasi 1 respons per akun dan Anda sudah mengisinya.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $msg], 422);
+            }
+
+            return back()->with('error', $msg);
+        }
+
+        $dataForm->loadMissing('kolomFormulir');
         $fields = $dataForm->fields ?? [];
         $values = [];
+        $cleanStatusMap = [];
         $attachments = [];
         $errors = [];
 
         foreach ($fields as $field) {
             $fid = (string) ($field['id'] ?? '');
-            $label = (string) ($field['label'] ?? $fid);
             $type = (string) ($field['type'] ?? 'text');
             $required = (bool) ($field['required'] ?? false);
 
@@ -92,6 +140,7 @@ class FormSubmissionController extends Controller
                         $errors[$fid] = 'Lampiran bukti wajib diunggah.';
                     } else {
                         $values[$fid] = '';
+                        $cleanStatusMap[$fid] = true;
                     }
                     continue;
                 }
@@ -112,16 +161,27 @@ class FormSubmissionController extends Controller
 
                 $storedPath = $uploadedFile->store("submissions/{$dataForm->code}", 'local');
                 $values[$fid] = $uploadedFile->getClientOriginalName();
+                $cleanStatusMap[$fid] = true;
                 if ($storedPath !== false) {
                     $attachments[$fid] = $storedPath;
                 }
             } else {
-                $rawValue = (string) $request->input("values.{$fid}", '');
+                $rawInput = $request->input("values.{$fid}", '');
+                if ($type === 'checkbox' && is_array($rawInput)) {
+                    $rawValue = implode(', ', array_values(array_filter(array_map(
+                        static fn ($item): string => trim((string) $item),
+                        $rawInput
+                    ), static fn (string $s): bool => $s !== '')));
+                } else {
+                    $rawValue = is_array($rawInput) ? implode(', ', $rawInput) : (string) $rawInput;
+                }
+
                 $fieldErr = $quality->fieldError($field, $rawValue);
                 if ($fieldErr !== null) {
                     $errors[$fid] = $fieldErr;
                 } else {
                     $values[$fid] = $rawValue;
+                    $cleanStatusMap[$fid] = $rawValue === '' || $quality->normalizeValue($field, $rawValue) === $rawValue;
                 }
             }
         }
@@ -140,14 +200,24 @@ class FormSubmissionController extends Controller
                 ->with('open_form_code', $dataForm->code);
         }
 
-        $submission = FormSubmission::create([
-            'code' => CodeGenerator::next('S', 'form_submissions'),
-            'data_form_id' => $dataForm->id,
-            'user_id' => $user->id,
-            'values' => $values,
-            'attachments' => ! empty($attachments) ? $attachments : null,
-            'submitted_at' => now(),
-        ]);
+        $submission = DB::transaction(function () use ($dataForm, $user, $values, $attachments, $cleanStatusMap, $preprocessing): FormSubmission {
+            $firstAttachment = ! empty($attachments) ? reset($attachments) : null;
+
+            $sub = FormSubmission::create([
+                'code' => CodeGenerator::next('S', 'pengisian_formulir'),
+                'id_formulir' => $dataForm->id,
+                'diisi_oleh' => $user->id,
+                'waktu_pengisian' => now(),
+                'status_validasi' => 'mentah',
+                'sumber_input' => 'formulir',
+                'jalur_berkas_bukti' => is_string($firstAttachment) ? $firstAttachment : null,
+            ]);
+
+            $sub->syncValues($dataForm, $values, ! empty($attachments) ? $attachments : null, $cleanStatusMap, false);
+            $preprocessing->markFormNeedsPreprocessing($dataForm);
+
+            return $sub;
+        });
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -156,7 +226,7 @@ class FormSubmissionController extends Controller
             ], 201);
         }
 
-        return back()->with('success', 'Formulir Berhasil Disimpan');
+        return back()->with('success', "Formulir Berhasil Disimpan ({$submission->code}). Data masuk ke antrean Pre-processing Wali Data.");
     }
 
     public function history(Request $request): View
@@ -168,11 +238,11 @@ class FormSubmissionController extends Controller
         $formFilter = (string) $request->query('form', 'all');
 
         $query = FormSubmission::query()
-            ->with(['dataForm', 'user'])
-            ->orderByDesc('submitted_at');
+            ->with(['dataForm.kolomFormulir', 'user', 'dataIsian.kolomFormulir'])
+            ->orderByDesc('waktu_pengisian');
 
         if ($own) {
-            $query->where('user_id', $user->id);
+            $query->where('diisi_oleh', $user->id);
         }
 
         if ($formFilter !== '' && $formFilter !== 'all') {
@@ -185,25 +255,26 @@ class FormSubmissionController extends Controller
             $like = '%'.strtolower($q).'%';
             $query->where(function ($sub) use ($like): void {
                 $sub->whereHas('user', function ($uq) use ($like): void {
-                    $uq->whereRaw('LOWER(name) LIKE ?', [$like])
+                    $uq->whereRaw('LOWER(nama_pengguna) LIKE ?', [$like])
                         ->orWhereRaw('LOWER(nim) LIKE ?', [$like]);
                 })->orWhereHas('dataForm', function ($fq) use ($like): void {
-                    $fq->whereRaw('LOWER(title) LIKE ?', [$like]);
+                    $fq->whereRaw('LOWER(judul) LIKE ?', [$like]);
+                })->orWhereHas('dataIsian', function ($dq) use ($like): void {
+                    $dq->whereRaw('LOWER(nilai) LIKE ?', [$like]);
                 });
             });
         }
 
         $submissions = $query->paginate(10)->withQueryString();
 
-        $formsUsedQuery = DataForm::query()
+        $formsUsed = DataForm::query()
             ->whereHas('submissions', function ($sub) use ($own, $user): void {
                 if ($own) {
-                    $sub->where('user_id', $user->id);
+                    $sub->where('diisi_oleh', $user->id);
                 }
             })
-            ->orderBy('title');
-
-        $formsUsed = $formsUsedQuery->get(['id', 'code', 'title']);
+            ->orderBy('judul')
+            ->get(['id', 'code', 'judul']);
 
         return view('panel.riwayat', compact(
             'submissions',
@@ -218,10 +289,11 @@ class FormSubmissionController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->isStaff() && $submission->user_id !== $user->id) {
+        if (! $user->isStaff() && (int) $submission->diisi_oleh !== (int) $user->id) {
             abort(403, 'Anda tidak berhak mengunduh lampiran ini.');
         }
 
+        $submission->loadMissing('dataIsian.kolomFormulir');
         $attachments = $submission->attachments ?? [];
         $path = $attachments[$fieldId] ?? null;
 

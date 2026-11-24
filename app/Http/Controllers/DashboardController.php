@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use App\Models\DashboardMetric;
+use App\Models\Dataset;
 use App\Models\Visualization;
 use App\Services\ChartPaletteService;
 use Illuminate\Http\Request;
@@ -17,18 +17,17 @@ class DashboardController extends Controller
         $user = Auth::user();
         $privileged = $user && $user->isStaff();
 
-        $visualizations = Visualization::query()
+        $visualizations = Visualization::datasetCharts()
             ->with(['dataset.category'])
-            ->where('show', true)
             ->orderBy('id')
             ->get()
             ->filter(function (Visualization $viz) use ($privileged): bool {
                 $dataset = $viz->dataset;
-                if (! $dataset) {
+                if (! $dataset || ! $viz->show || ! $dataset->isPublished()) {
                     return false;
                 }
 
-                return $privileged || $dataset->access === 'public';
+                return $privileged || $dataset->tipe_akses === 'public';
             })
             ->values();
 
@@ -42,8 +41,8 @@ class DashboardController extends Controller
                 continue;
             }
 
-            $cols = $dataset->cols ?? [];
-            $rows = $dataset->rows ?? [];
+            $cols = $dataset->kolom ?? [];
+            $rows = $dataset->baris ?? [];
             $numericMap = ChartPaletteService::numericColumns($cols, $rows);
             unset($numericMap[$viz->label_col]);
 
@@ -54,15 +53,16 @@ class DashboardController extends Controller
 
             $vizList[] = [
                 'id' => $viz->code,
-                'title' => $viz->title,
+                'title' => $viz->judul,
                 'datasetId' => $dataset->code,
-                'datasetTitle' => $dataset->title,
+                'datasetTitle' => $dataset->judul,
+                'datasetUrl' => route('dataset', ['q' => $dataset->judul]),
                 'tahun' => $dataset->tahun,
                 'kategori' => $dataset->category?->code ?? '',
-                'kategoriName' => $dataset->category?->name ?? '',
+                'kategoriName' => $dataset->category?->nama_kategori ?? '',
                 'labelCol' => $viz->label_col,
                 'valueCol' => $viz->value_col,
-                'kind' => $viz->kind,
+                'kind' => $viz->tipe_grafik,
                 'color' => $viz->color,
                 'palette' => ChartPaletteService::palette($viz->color),
                 'cols' => $cols,
@@ -78,34 +78,43 @@ class DashboardController extends Controller
         $cats = Category::query()
             ->whereIn('code', $usedCategoryCodes)
             ->orderBy('id')
-            ->get(['code', 'name'])
-            ->toArray();
+            ->get()
+            ->map(fn (Category $cat): array => [
+                'code' => $cat->code,
+                'name' => $cat->nama_kategori,
+            ])
+            ->values()
+            ->all();
 
         $selectedYear = (string) $request->query('tahun', 'all');
         $selectedCat = (string) $request->query('kategori', 'all');
 
-        $groupedMetrics = DashboardMetric::query()
-            ->orderBy('sort_order')
+        $groupedMetrics = Visualization::metricCards()
             ->orderBy('id')
             ->get()
-            ->groupBy('section');
+            ->sortBy(fn (Visualization $m): int => (int) ($m->konfigurasi_query['sort_order'] ?? 0))
+            ->groupBy(fn (Visualization $m): string => (string) ($m->konfigurasi_query['section'] ?? 'akademik1'));
 
-        $formatMetric = static function (DashboardMetric $metric): array {
+        $formatMetric = static function (Visualization $metric): array {
+            $cfg = $metric->konfigurasi_query ?? [];
+            $color = (string) ($cfg['color'] ?? 'sky');
+            $trendVal = $cfg['trend_value'] ?? null;
+
             return [
                 'id' => $metric->id,
-                'title' => $metric->title,
-                'color' => $metric->color,
-                'palette' => ChartPaletteService::palette($metric->color),
-                'total' => $metric->total,
-                'unit' => $metric->unit,
-                'def' => $metric->default_kind,
-                'trend' => $metric->trend_value ? [
-                    'v' => $metric->trend_value,
-                    'up' => (bool) $metric->trend_up,
+                'title' => $metric->judul,
+                'color' => $color,
+                'palette' => ChartPaletteService::palette($color),
+                'total' => (string) ($cfg['total'] ?? '0'),
+                'unit' => (string) ($cfg['unit'] ?? ''),
+                'def' => $metric->tipe_grafik,
+                'trend' => $trendVal ? [
+                    'v' => (string) $trendVal,
+                    'up' => (bool) ($cfg['trend_up'] ?? true),
                 ] : null,
-                'data' => $metric->data ?? [],
-                'foot' => $metric->foot,
-                'table' => $metric->table_data ?? [],
+                'data' => $cfg['data'] ?? [],
+                'foot' => $cfg['foot'] ?? null,
+                'table' => $cfg['table_data'] ?? [],
             ];
         };
 
@@ -116,13 +125,21 @@ class DashboardController extends Controller
             'nonakademik2' => $groupedMetrics->get('nonakademik2', collect())->map($formatMetric)->values()->all(),
         ];
 
+        $summaryStats = [
+            'metricCards' => count($metrics['akademik1']) + count($metrics['akademik2']) + count($metrics['nonakademik1']) + count($metrics['nonakademik2']),
+            'featuredCharts' => count($vizList),
+            'publicDatasets' => Dataset::published()->where('tipe_akses', 'public')->count(),
+            'categories' => Category::query()->count(),
+        ];
+
         return view('pages.dashboard', compact(
             'metrics',
             'vizList',
             'years',
             'cats',
             'selectedYear',
-            'selectedCat'
+            'selectedCat',
+            'summaryStats'
         ));
     }
 }

@@ -18,6 +18,7 @@ use App\Http\Controllers\Panel\VisualizationController;
 use App\Http\Controllers\PengisianDataController;
 use App\Http\Controllers\TentangController;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Language switcher (ID / EN)
@@ -37,6 +38,7 @@ Route::post('/dataset/{dataset:code}/request', [DatasetController::class, 'store
 Route::get('/berita', [BeritaController::class, 'index'])->name('berita');
 Route::get('/berita/{code}', [BeritaController::class, 'show'])->name('berita.show');
 Route::get('/pengisian-data', [PengisianDataController::class, 'index'])->name('pengisian-data');
+Route::get('/formulir/{dataForm:code}', [FormSubmissionController::class, 'showPublicForm'])->name('formulir.show');
 Route::get('/tentang-kami', [TentangController::class, 'index'])->name('tentang-kami');
 
 // Authentication
@@ -55,8 +57,8 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
     Route::get('/riwayat', [FormSubmissionController::class, 'history'])->name('riwayat');
     Route::get('/submissions/{submission:code}/file/{fieldId}', [FormSubmissionController::class, 'downloadFile'])->name('submissions.file');
 
-    // Produsen Data
-    Route::middleware('role:produsen')->group(function (): void {
+    // Pengisian Formulir: Produsen Data & Admin (Wali Data 403)
+    Route::middleware('role:produsen,admin')->group(function (): void {
         Route::get('/isi', [FormSubmissionController::class, 'index'])->name('isi');
         Route::post('/isi/{dataForm:code}', [FormSubmissionController::class, 'store'])->name('isi.submit');
     });
@@ -66,14 +68,28 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
         Route::get('/formulir', [DataFormController::class, 'index'])->name('formulir');
         Route::post('/formulir', [DataFormController::class, 'store'])->name('formulir.store');
         Route::put('/formulir/{dataForm:code}', [DataFormController::class, 'update'])->name('formulir.update');
+        Route::patch('/formulir/{dataForm:code}/toggle', [DataFormController::class, 'toggleActive'])->name('formulir.toggle');
         Route::delete('/formulir/{dataForm:code}', [DataFormController::class, 'destroy'])
             ->middleware('role:admin')
             ->name('formulir.destroy');
 
-        Route::get('/data', [CollectedDataController::class, 'index'])->name('data');
+        // Fase Pre-processing Data (kanonis /panel/preprocessing + alias /panel/data)
+        Route::get('/preprocessing', [CollectedDataController::class, 'index'])->name('preprocessing');
+        Route::get('/data', fn (Request $request): RedirectResponse => redirect()->route('panel.preprocessing', $request->query()))->name('data');
+
+        Route::get('/preprocessing/{dataForm:code}/csv', [CollectedDataController::class, 'exportCsv'])->name('preprocessing.csv');
         Route::get('/data/{dataForm:code}/csv', [CollectedDataController::class, 'exportCsv'])->name('data.csv');
-        Route::put('/data/submissions/{submission:code}', [CollectedDataController::class, 'updateSubmission'])->name('data.submissions.update');
-        Route::delete('/data/submissions/{submission:code}', [CollectedDataController::class, 'destroySubmission'])->name('data.submissions.destroy');
+        Route::post('/preprocessing/{dataForm:code}/import', [CollectedDataController::class, 'importResponses'])->name('preprocessing.import');
+        Route::post('/data/{dataForm:code}/import', [CollectedDataController::class, 'importResponses'])->name('data.import');
+
+        Route::post('/preprocessing/{dataForm:code}/normalize', [CollectedDataController::class, 'normalizeBatch'])->name('preprocessing.normalize');
+        Route::post('/preprocessing/{dataForm:code}/deduplicate', [CollectedDataController::class, 'deduplicateBatch'])->name('preprocessing.deduplicate');
+        Route::post('/preprocessing/{dataForm:code}/impute', [CollectedDataController::class, 'imputeBatch'])->name('preprocessing.impute');
+        Route::post('/preprocessing/{dataForm:code}/finalize', [CollectedDataController::class, 'finalizePreprocessing'])->name('preprocessing.finalize');
+
+        Route::put('/preprocessing/submissions/{submission:code}', [CollectedDataController::class, 'updateSubmission'])->name('data.submissions.update');
+        Route::patch('/preprocessing/submissions/{submission:code}/status', [CollectedDataController::class, 'updateSubmissionStatus'])->name('preprocessing.submissions.status');
+        Route::delete('/preprocessing/submissions/{submission:code}', [CollectedDataController::class, 'destroySubmission'])->name('data.submissions.destroy');
 
         Route::get('/kategori', [CategoryController::class, 'index'])->name('kategori');
         Route::post('/kategori', [CategoryController::class, 'store'])->name('kategori.store');
@@ -85,6 +101,8 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
         Route::get('/dataset', [ManageDatasetController::class, 'index'])->name('dataset');
         Route::post('/dataset/from-form', [ManageDatasetController::class, 'storeFromForm'])->name('dataset.from-form');
         Route::patch('/dataset/{dataset:code}/access', [ManageDatasetController::class, 'toggleAccess'])->name('dataset.access');
+        Route::patch('/dataset/{dataset:code}/publish', [ManageDatasetController::class, 'togglePublish'])->name('dataset.publish');
+        Route::post('/dataset/{dataset:code}/sync', [ManageDatasetController::class, 'syncFromForm'])->name('dataset.sync');
         Route::put('/dataset/{dataset:code}', [ManageDatasetController::class, 'update'])->name('dataset.update');
         Route::delete('/dataset/{dataset:code}', [ManageDatasetController::class, 'destroy'])
             ->middleware('role:admin')

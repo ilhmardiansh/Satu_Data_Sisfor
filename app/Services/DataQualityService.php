@@ -10,11 +10,12 @@ use Illuminate\Support\Collection;
 class DataQualityService
 {
     /**
-     * Normalize whitespace and canonicalize select options.
+     * Normalize whitespace, standardize choice labels/checkboxes, and optionally clean numbers/case.
      *
      * @param  array<string, mixed>  $field
+     * @param  array{normalize_numbers?: bool, text_case?: string}  $options
      */
-    public function normalizeValue(array $field, string $value): string
+    public function normalizeValue(array $field, string $value, array $options = []): string
     {
         $type = (string) ($field['type'] ?? 'text');
         if ($type === 'file') {
@@ -33,12 +34,66 @@ class DataQualityService
 
         $clean = preg_replace('/\s+/', ' ', trim($value)) ?? trim($value);
 
-        if ($type === 'select') {
-            $options = $field['options'] ?? [];
-            foreach ($options as $opt) {
+        if ($type === 'number' && ($options['normalize_numbers'] ?? false) && $clean !== '') {
+            $stripped = preg_replace('/rp|\s|%/iu', '', $clean) ?? $clean;
+            if (preg_match('/^-?\d{1,3}(\.\d{3})+(,\d+)?$/', $stripped) === 1) {
+                $stripped = str_replace(',', '.', str_replace('.', '', $stripped));
+            } elseif (preg_match('/^-?\d+,\d+$/', $stripped) === 1) {
+                $stripped = str_replace(',', '.', $stripped);
+            }
+            if (is_numeric($stripped)) {
+                return $stripped;
+            }
+        }
+
+        if ($type === 'select' || $type === 'radio') {
+            foreach (($field['options'] ?? []) as $opt) {
                 if (mb_strtolower((string) $opt) === mb_strtolower($clean)) {
                     return (string) $opt;
                 }
+            }
+        }
+
+        if ($type === 'checkbox') {
+            if ($clean === '') {
+                return '';
+            }
+            $tokens = array_values(array_filter(array_map(
+                static fn (string $part): string => preg_replace('/\s+/', ' ', trim($part)) ?? trim($part),
+                explode(',', $clean)
+            ), static fn (string $part): bool => $part !== ''));
+
+            $optionsMap = [];
+            foreach (($field['options'] ?? []) as $opt) {
+                $optStr = (string) $opt;
+                $optionsMap[mb_strtolower($optStr)] = $optStr;
+            }
+
+            $normalized = [];
+            $seen = [];
+            foreach ($tokens as $tok) {
+                $lower = mb_strtolower($tok);
+                $canon = $optionsMap[$lower] ?? $tok;
+                $canonKey = mb_strtolower($canon);
+                if (! isset($seen[$canonKey])) {
+                    $seen[$canonKey] = true;
+                    $normalized[] = $canon;
+                }
+            }
+
+            return implode(', ', $normalized);
+        }
+
+        if ($type === 'text' && $clean !== '') {
+            $case = (string) ($options['text_case'] ?? 'none');
+            if ($case === 'title') {
+                return mb_convert_case($clean, MB_CASE_TITLE, 'UTF-8');
+            }
+            if ($case === 'upper') {
+                return mb_strtoupper($clean, 'UTF-8');
+            }
+            if ($case === 'lower') {
+                return mb_strtolower($clean, 'UTF-8');
             }
         }
 
@@ -71,10 +126,23 @@ class DataQualityService
             }
         }
 
-        if ($type === 'select') {
+        if ($type === 'select' || $type === 'radio') {
             $options = array_map('strval', $field['options'] ?? []);
             if (! in_array($clean, $options, true)) {
                 return 'Nilai tidak sesuai pilihan formulir.';
+            }
+        }
+
+        if ($type === 'checkbox') {
+            $options = array_map('strval', $field['options'] ?? []);
+            $items = array_values(array_filter(array_map('trim', explode(',', $clean)), static fn (string $x): bool => $x !== ''));
+            if (empty($items)) {
+                return $required ? 'Data wajib masih kosong.' : null;
+            }
+            foreach ($items as $item) {
+                if (! in_array($item, $options, true)) {
+                    return 'Terdapat pilihan kotak centang yang tidak sesuai formulir.';
+                }
             }
         }
 
@@ -87,6 +155,7 @@ class DataQualityService
 
     /**
      * Inspect all submissions of a form for duplicates, missing required values, invalid values, and formatting issues.
+     * Rejected rows are excluded from blocking active duplicate checks and finalization.
      *
      * @param  Collection<int, FormSubmission>  $submissions
      * @return array<int, array<int, string>>
@@ -97,8 +166,12 @@ class DataQualityService
         $groups = [];
 
         foreach ($submissions as $sub) {
+            if ($sub->status_validasi === 'ditolak') {
+                continue;
+            }
+
             $values = $sub->values ?? [];
-            $parts = [$sub->user_id];
+            $parts = [$sub->diisi_oleh];
             foreach ($fields as $field) {
                 $fid = (string) ($field['id'] ?? '');
                 $parts[] = mb_strtolower($this->normalizeValue($field, (string) ($values[$fid] ?? '')));
@@ -118,9 +191,14 @@ class DataQualityService
 
         $result = [];
         foreach ($submissions as $sub) {
+            if ($sub->status_validasi === 'ditolak') {
+                $result[$sub->id] = [];
+                continue;
+            }
+
             $issues = [];
             if (isset($duplicateIds[$sub->id])) {
-                $issues[] = 'Data ganda: pengirim dan isi sama. Tinjau sebelum menghapus.';
+                $issues[] = 'Data ganda: pengirim dan isi sama. Tinjau atau deduplikasi pada pre-processing.';
             }
 
             $values = $sub->values ?? [];

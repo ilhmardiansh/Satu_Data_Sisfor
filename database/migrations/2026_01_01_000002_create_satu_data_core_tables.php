@@ -6,128 +6,128 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('categories', function (Blueprint $table): void {
+        Schema::create('kategori', function (Blueprint $table): void {
             $table->id();
             $table->string('code', 40)->unique();
-            $table->string('name');
-            $table->text('description')->nullable();
+            $table->string('nama_kategori', 120);
+            $table->text('deskripsi')->nullable();
             $table->timestamps();
         });
 
-        Schema::create('data_forms', function (Blueprint $table): void {
+        Schema::create('formulir', function (Blueprint $table): void {
             $table->id();
             $table->string('code', 40)->unique();
-            $table->foreignId('category_id')->constrained('categories')->restrictOnDelete();
-            $table->string('title');
-            $table->text('description')->nullable();
+            $table->foreignId('id_kategori')->constrained('kategori')->restrictOnDelete();
+            $table->string('judul', 255);
+            $table->text('deskripsi')->nullable();
+            $table->dateTime('tanggal_waktu');
+            $table->boolean('status_aktif')->default(true);
             $table->unsignedSmallInteger('tahun');
-            $table->string('periode', 20);
-            $table->string('target', 20);
-            $table->timestamp('deadline');
-            $table->json('fields');
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('periode', 30)->default('Ganjil');
+            $table->string('target', 30)->default('Semua');
+            $table->foreignId('dibuat_oleh')->nullable()->constrained('pengguna')->nullOnDelete();
             $table->timestamps();
         });
 
-        Schema::create('form_submissions', function (Blueprint $table): void {
+        Schema::create('kolom_formulir', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('id_formulir')->constrained('formulir')->cascadeOnDelete();
+            $table->string('kode_kolom', 60);
+            $table->string('label', 255);
+            $table->string('tipe_kolom', 30)->default('text');
+            $table->boolean('wajib_diisi')->default(false);
+            $table->json('opsi')->nullable();
+            $table->unsignedInteger('urutan')->default(0);
+            $table->timestamps();
+
+            $table->unique(['id_formulir', 'kode_kolom']);
+        });
+
+        Schema::create('pengisian_formulir', function (Blueprint $table): void {
             $table->id();
             $table->string('code', 40)->unique();
-            $table->foreignId('data_form_id')->constrained('data_forms')->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->json('values');
-            $table->json('attachments')->nullable();
-            $table->timestamp('submitted_at');
-            $table->foreignId('cleaned_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('cleaned_at')->nullable();
+            $table->foreignId('id_formulir')->constrained('formulir')->cascadeOnDelete();
+            $table->foreignId('diisi_oleh')->nullable()->constrained('pengguna')->nullOnDelete();
+            $table->dateTime('waktu_pengisian');
+            $table->string('jalur_berkas_bukti', 500)->nullable();
+            $table->foreignId('dibersihkan_oleh')->nullable()->constrained('pengguna')->nullOnDelete();
+            $table->dateTime('waktu_dibersihkan')->nullable();
             $table->timestamps();
         });
 
-        Schema::create('datasets', function (Blueprint $table): void {
+        Schema::create('data_isian', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('id_pengisian')->constrained('pengisian_formulir')->cascadeOnDelete();
+            $table->foreignId('id_kolom')->constrained('kolom_formulir')->cascadeOnDelete();
+            $table->longText('nilai')->nullable();
+            $table->boolean('status_bersih')->default(true);
+            $table->string('jalur_berkas', 500)->nullable();
+            $table->timestamps();
+
+            $table->unique(['id_pengisian', 'id_kolom']);
+        });
+
+        Schema::create('dataset', function (Blueprint $table): void {
             $table->id();
             $table->string('code', 40)->unique();
-            $table->foreignId('category_id')->constrained('categories')->restrictOnDelete();
-            $table->foreignId('source_form_id')->nullable()->constrained('data_forms')->nullOnDelete();
-            $table->string('title');
-            $table->text('description')->nullable();
-            $table->unsignedSmallInteger('tahun');
-            $table->string('periode', 20);
-            $table->string('access', 20)->default('private');
-            $table->string('format', 10)->default('CSV');
-            $table->string('updated_label', 40)->nullable();
-            $table->json('cols');
-            $table->json('rows');
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('id_kategori')->constrained('kategori')->restrictOnDelete();
+            $table->foreignId('id_formulir_sumber')->nullable()->constrained('formulir')->nullOnDelete();
+            $table->string('judul', 255);
+            $table->text('deskripsi')->nullable();
+            $table->string('tahun', 10);
+            $table->string('tipe_akses', 20)->default('public');
+            $table->string('periode', 30)->default('Ganjil');
+            $table->string('format', 20)->default('CSV');
+            $table->string('label_diperbarui', 60)->nullable();
+            $table->json('kolom');
+            $table->longText('baris');
+            $table->foreignId('dibuat_oleh')->nullable()->constrained('pengguna')->nullOnDelete();
             $table->timestamps();
         });
 
-        Schema::create('data_requests', function (Blueprint $table): void {
+        Schema::create('permohonan_data', function (Blueprint $table): void {
             $table->id();
             $table->string('code', 40)->unique();
-            $table->foreignId('dataset_id')->constrained('datasets')->cascadeOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('session_token', 100)->nullable()->index();
-            $table->string('nama');
-            $table->string('email');
-            $table->string('hp', 30);
-            $table->string('nim', 50);
-            $table->string('tujuan');
-            $table->text('deskripsi');
+            $table->foreignId('id_dataset')->constrained('dataset')->cascadeOnDelete();
+            $table->foreignId('diajukan_oleh')->nullable()->constrained('pengguna')->nullOnDelete();
+            $table->string('session_token', 80)->nullable()->index();
+            $table->string('nama_pemohon', 160);
+            $table->string('email_pemohon', 160);
+            $table->string('hp_pemohon', 40);
+            $table->string('nim_pemohon', 60);
+            $table->string('tujuan', 160);
+            $table->text('alasan');
             $table->string('status', 20)->default('menunggu');
-            $table->text('note')->nullable();
-            $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('decided_at')->nullable();
-            $table->timestamp('requested_at');
+            $table->text('catatan_konfirmasi')->nullable();
+            $table->foreignId('dikonfirmasi_oleh')->nullable()->constrained('pengguna')->nullOnDelete();
+            $table->dateTime('waktu_pengajuan');
+            $table->dateTime('waktu_konfirmasi')->nullable();
             $table->timestamps();
         });
 
-        Schema::create('visualizations', function (Blueprint $table): void {
+        Schema::create('visualisasi_dashboard', function (Blueprint $table): void {
             $table->id();
             $table->string('code', 40)->unique();
-            $table->string('title');
-            $table->foreignId('dataset_id')->constrained('datasets')->cascadeOnDelete();
-            $table->unsignedInteger('label_col')->default(0);
-            $table->unsignedInteger('value_col')->default(1);
-            $table->string('kind', 20)->default('bar');
-            $table->string('color', 20)->default('sky');
-            $table->boolean('show')->default(true);
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamps();
-        });
-
-        Schema::create('dashboard_metrics', function (Blueprint $table): void {
-            $table->id();
-            $table->string('section', 30)->index();
-            $table->unsignedInteger('sort_order')->default(0);
-            $table->string('title');
-            $table->string('color', 20);
-            $table->string('total', 50);
-            $table->string('unit', 80);
-            $table->string('default_kind', 20)->default('donut');
-            $table->string('trend_value', 50)->nullable();
-            $table->boolean('trend_up')->nullable();
-            $table->json('data');
-            $table->json('foot')->nullable();
-            $table->json('table_data');
+            $table->foreignId('id_dataset')->nullable()->constrained('dataset')->cascadeOnDelete();
+            $table->string('judul', 255);
+            $table->string('tipe_grafik', 30)->default('bar');
+            $table->longText('konfigurasi_query');
+            $table->foreignId('dibuat_oleh')->nullable()->constrained('pengguna')->nullOnDelete();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('dashboard_metrics');
-        Schema::dropIfExists('visualizations');
-        Schema::dropIfExists('data_requests');
-        Schema::dropIfExists('datasets');
-        Schema::dropIfExists('form_submissions');
-        Schema::dropIfExists('data_forms');
-        Schema::dropIfExists('categories');
+        Schema::dropIfExists('visualisasi_dashboard');
+        Schema::dropIfExists('permohonan_data');
+        Schema::dropIfExists('dataset');
+        Schema::dropIfExists('data_isian');
+        Schema::dropIfExists('pengisian_formulir');
+        Schema::dropIfExists('kolom_formulir');
+        Schema::dropIfExists('formulir');
+        Schema::dropIfExists('kategori');
     }
 };

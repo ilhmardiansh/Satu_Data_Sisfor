@@ -26,7 +26,7 @@ class DataRequestController extends Controller
 
         $query = DataRequest::query()
             ->with(['dataset', 'decider'])
-            ->orderByDesc('requested_at');
+            ->orderByDesc('waktu_pengajuan');
 
         if ($tab !== 'all') {
             $query->where('status', $tab);
@@ -53,12 +53,11 @@ class DataRequestController extends Controller
 
         $note = trim((string) ($validated['note'] ?? ''));
 
-        $dataRequest->update([
-            'status' => $validated['status'],
-            'note' => $note !== '' ? $note : null,
-            'decided_by' => $request->user()->id,
-            'decided_at' => now(),
-        ]);
+        $dataRequest->konfirmasiPermohonan(
+            $validated['status'],
+            $note !== '' ? $note : null,
+            $request->user()->id
+        );
 
         $message = $validated['status'] === 'disetujui'
             ? "Permohonan {$dataRequest->code} disetujui. Pemohon kini dapat mengunduh dataset."

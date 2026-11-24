@@ -2,14 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\AmiBenchmark;
-use App\Models\AmiIndicator;
-use App\Models\AmiPtkFinding;
-use App\Models\AmiRecommendation;
-use App\Models\AmiStandardSummary;
 use App\Models\Category;
 use App\Models\DataForm;
 use App\Models\Dataset;
+use App\Models\FormSubmission;
+use App\Models\SubmissionValue;
 use App\Models\User;
 use App\Models\Visualization;
 use DateTimeImmutable;
@@ -208,7 +205,7 @@ class AmiWorkbookImporter
     }
 
     /**
-     * Persist parsed AMI data into normalized tables, 10 public datasets, 2 visualizations, and Daftar Tilik form.
+     * Persist parsed AMI Excel data into DPPL forms, normalized form submissions, public datasets, and dashboard charts.
      *
      * @param  array<string, Category>  $categories
      * @return array<string, int>
@@ -221,89 +218,66 @@ class AmiWorkbookImporter
         bool $clearExisting = true
     ): array {
         $parsed = $this->parseWithSnapshot($xlsxPath, $snapshotPath);
+        $quality = app(DataQualityService::class);
 
-        return DB::transaction(function () use ($parsed, $creator, $categories, $clearExisting): array {
+        return DB::transaction(function () use ($parsed, $creator, $categories, $clearExisting, $quality): array {
             $creatorId = $creator?->id
-                ?? User::query()->where('role', 'wali')->value('id')
-                ?? User::query()->where('role', 'admin')->value('id');
+                ?? User::withRole('wali')->value('id')
+                ?? User::withRole('admin')->value('id');
+
+            $dosenSubmitterId = User::query()->where('nim', '0712048601')->value('id') ?? $creatorId;
 
             $amiCategory = $categories['KT-AMI-01'] ?? Category::query()->firstOrCreate(
                 ['code' => 'KT-AMI-01'],
                 [
-                    'name' => 'Audit Mutu Internal (AMI)',
-                    'description' => 'Instrumen SNPT-U 28 & 38 standar, benchmark 16 prodi UNUSA, Permintaan Tindakan Koreksi (PTK), dan saran pengembangan Prodi S1 Sistem Informasi.',
+                    'nama_kategori' => 'Audit Mutu Internal (AMI)',
+                    'deskripsi' => 'Instrumen SNPT-U 28 & 38 standar, benchmark 16 prodi UNUSA, Permintaan Tindakan Koreksi (PTK), dan saran pengembangan Prodi S1 Sistem Informasi.',
                 ]
             );
 
+            $formsMap = $this->upsertAmiForms($parsed['audit_checklist_fields'], $amiCategory, $creatorId);
+
             if ($clearExisting) {
-                AmiRecommendation::query()->delete();
-                AmiPtkFinding::query()->delete();
-                AmiBenchmark::query()->delete();
-                AmiStandardSummary::query()->delete();
-                AmiIndicator::query()->delete();
+                $formIds = array_map(fn (DataForm $f): int => $f->id, [
+                    $formsMap['F-06'],
+                    $formsMap['F-07'],
+                    $formsMap['F-08'],
+                ]);
+                FormSubmission::query()->whereIn('id_formulir', $formIds)->delete();
             }
 
-            foreach (array_chunk($parsed['indicators'], 100) as $chunk) {
-                $now = now();
-                $rows = array_map(fn (array $item): array => [
-                    ...$item,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ], $chunk);
-                AmiIndicator::query()->insert($rows);
-            }
+            $dataIsianCount = 0;
+            $dataIsianCount += $this->bulkImportFormRows(
+                $formsMap['F-06'],
+                $this->mapIndicatorSubmissionRows($parsed['indicators']),
+                'S-AMI-IND-',
+                $dosenSubmitterId,
+                $quality
+            );
+            $dataIsianCount += $this->bulkImportFormRows(
+                $formsMap['F-07'],
+                $this->mapPtkSubmissionRows($parsed['ptk_findings']),
+                'S-AMI-PTK-',
+                $dosenSubmitterId,
+                $quality
+            );
+            $dataIsianCount += $this->bulkImportFormRows(
+                $formsMap['F-08'],
+                $this->mapRecommendationSubmissionRows($parsed['recommendations']),
+                'S-AMI-SRN-',
+                $dosenSubmitterId,
+                $quality
+            );
 
-            foreach ($parsed['standard_summaries'] as $summary) {
-                AmiStandardSummary::create($summary);
-            }
-
-            foreach (array_chunk($parsed['benchmarks'], 100) as $chunk) {
-                $now = now();
-                $rows = array_map(fn (array $item): array => [
-                    'standar_nomor' => $item['standar_nomor'],
-                    'standar_nama' => $item['standar_nama'],
-                    'sub_kelompok' => $item['sub_kelompok'],
-                    'no_butir' => $item['no_butir'],
-                    'indikator' => $item['indikator'],
-                    'prodi_values' => json_encode($item['prodi_values'], JSON_UNESCAPED_UNICODE),
-                    'nilai_si' => $item['nilai_si'],
-                    'rekap_unusa' => $item['rekap_unusa'],
-                    'baseline_2023' => $item['baseline_2023'],
-                    'target_2024' => $item['target_2024'],
-                    'asal_data_2023' => $item['asal_data_2023'],
-                    'asal_data_2024' => $item['asal_data_2024'],
-                    'catatan_review_prodi' => $item['catatan_review_prodi'],
-                    'sort_order' => $item['sort_order'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ], $chunk);
-                AmiBenchmark::query()->insert($rows);
-            }
-
-            foreach (array_chunk($parsed['ptk_findings'], 100) as $chunk) {
-                $now = now();
-                $rows = array_map(fn (array $item): array => [
-                    ...$item,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ], $chunk);
-                AmiPtkFinding::query()->insert($rows);
-            }
-
-            foreach ($parsed['recommendations'] as $rec) {
-                AmiRecommendation::create($rec);
-            }
-
-            $datasetsMap = $this->upsertAmiDatasets($parsed, $amiCategory, $creatorId);
+            $datasetsMap = $this->upsertAmiDatasets($parsed, $amiCategory, $formsMap, $creatorId);
             $vizCount = $this->upsertAmiVisualizations($datasetsMap, $creatorId);
-            $this->upsertChecklistForm($parsed['audit_checklist_fields'], $amiCategory, $creatorId);
 
             return [
-                'indicators' => count($parsed['indicators']),
-                'standard_summaries' => count($parsed['standard_summaries']),
-                'benchmarks' => count($parsed['benchmarks']),
-                'ptk_findings' => count($parsed['ptk_findings']),
-                'recommendations' => count($parsed['recommendations']),
+                'forms' => count($formsMap),
+                'indicators_submissions' => count($parsed['indicators']),
+                'ptk_submissions' => count($parsed['ptk_findings']),
+                'recommendation_submissions' => count($parsed['recommendations']),
+                'data_isian' => $dataIsianCount,
                 'datasets' => count($datasetsMap),
                 'visualizations' => $vizCount,
             ];
@@ -311,13 +285,280 @@ class AmiWorkbookImporter
     }
 
     /**
-     * Build and upsert the 10 structured AMI datasets (DS-13 .. DS-22).
+     * Create/update the 4 AMI DPPL formulir definitions (F-05..F-08) and their normalized kolom_formulir.
+     *
+     * @param  array<int, array<string, mixed>>  $checklistFields
+     * @return array<string, DataForm>
+     */
+    protected function upsertAmiForms(array $checklistFields, Category $amiCategory, ?int $creatorId): array
+    {
+        $specs = [
+            [
+                'code' => 'F-05',
+                'judul' => 'Daftar Tilik Audit Mutu Internal (LAM & 28 Standar)',
+                'deskripsi' => 'Instrumen pencatatan pertanyaan auditor, hasil observasi/visitasi, kesesuaian (S/TS), catatan khusus, saran, dan kesimpulan AMI Prodi S1 Sistem Informasi.',
+                'tahun' => 2026,
+                'periode' => 'Ganjil',
+                'target' => 'Dosen',
+                'fields' => $checklistFields,
+            ],
+            [
+                'code' => 'F-06',
+                'judul' => 'Formulir Input Instrumen AMI 28 Standar SNPT-U 2025/2026',
+                'deskripsi' => 'Formulir pengumpulan capaian indikator mutu 28 Standar SNPT-U Prodi S1 Sistem Informasi (sumber impor GForm/Excel AMI).',
+                'tahun' => 2025,
+                'periode' => 'Ganjil',
+                'target' => 'Dosen',
+                'fields' => [
+                    ['id' => 'q1', 'label' => 'Kode Indikator', 'type' => 'text', 'required' => true],
+                    ['id' => 'q2', 'label' => 'Kelompok Standar', 'type' => 'text', 'required' => true],
+                    ['id' => 'q3', 'label' => 'Nomor Standar', 'type' => 'number', 'required' => true],
+                    ['id' => 'q4', 'label' => 'Nama Standar Mutu', 'type' => 'text', 'required' => true],
+                    ['id' => 'q5', 'label' => 'Nomor Butir', 'type' => 'text', 'required' => false],
+                    ['id' => 'q6', 'label' => 'Indikator Mutu', 'type' => 'textarea', 'required' => true],
+                    ['id' => 'q7', 'label' => 'Baseline 2023', 'type' => 'text', 'required' => false],
+                    ['id' => 'q8', 'label' => 'Baseline 2024', 'type' => 'text', 'required' => false],
+                    ['id' => 'q9', 'label' => 'Target Akhir', 'type' => 'text', 'required' => false],
+                    ['id' => 'q10', 'label' => 'Realisasi', 'type' => 'text', 'required' => false],
+                    ['id' => 'q11', 'label' => 'Link Bukti Dokumen', 'type' => 'text', 'required' => false],
+                    ['id' => 'q12', 'label' => 'Konfirmasi Auditor (S/TS)', 'type' => 'text', 'required' => false],
+                    ['id' => 'q13', 'label' => 'Status Capaian', 'type' => 'text', 'required' => false],
+                    ['id' => 'q14', 'label' => 'Nilai Capaian', 'type' => 'text', 'required' => false],
+                ],
+            ],
+            [
+                'code' => 'F-07',
+                'judul' => 'Formulir Permintaan Tindakan Koreksi (PTK) AMI 2019-2025',
+                'deskripsi' => 'Formulir pelaporan temuan PTK Borang LAM, 28 Standar, dan Bank Dokumen beserta analisis penyebab dan tindak lanjut.',
+                'tahun' => 2025,
+                'periode' => 'Ganjil',
+                'target' => 'Dosen',
+                'fields' => [
+                    ['id' => 'q1', 'label' => 'Kode Temuan', 'type' => 'text', 'required' => true],
+                    ['id' => 'q2', 'label' => 'Jenis PTK', 'type' => 'select', 'required' => true, 'options' => ['PTK Borang LAM', 'PTK 28 Standar', 'PTK Bank Dokumen']],
+                    ['id' => 'q3', 'label' => 'Tahun Akademik', 'type' => 'text', 'required' => true],
+                    ['id' => 'q4', 'label' => 'No Temuan', 'type' => 'text', 'required' => false],
+                    ['id' => 'q5', 'label' => 'Kriteria / Standar', 'type' => 'text', 'required' => false],
+                    ['id' => 'q6', 'label' => 'Tanggal Temuan', 'type' => 'text', 'required' => false],
+                    ['id' => 'q7', 'label' => 'Uraian Temuan', 'type' => 'textarea', 'required' => true],
+                    ['id' => 'q8', 'label' => 'Kategori', 'type' => 'text', 'required' => false],
+                    ['id' => 'q9', 'label' => 'Analisis Penyebab', 'type' => 'textarea', 'required' => false],
+                    ['id' => 'q10', 'label' => 'Tindakan Koreksi / Pencegahan', 'type' => 'textarea', 'required' => false],
+                    ['id' => 'q11', 'label' => 'Rencana Selesai', 'type' => 'text', 'required' => false],
+                    ['id' => 'q12', 'label' => 'Status Tindak Lanjut', 'type' => 'text', 'required' => false],
+                    ['id' => 'q13', 'label' => 'Link Bukti Dokumen', 'type' => 'text', 'required' => false],
+                ],
+            ],
+            [
+                'code' => 'F-08',
+                'judul' => 'Formulir Saran Pengembangan & Rekomendasi Audit AMI 2025/2026',
+                'deskripsi' => 'Formulir catatan kelebihan dan peluang peningkatan mutu hasil Audit Mutu Internal Prodi S1 Sistem Informasi.',
+                'tahun' => 2026,
+                'periode' => 'Ganjil',
+                'target' => 'Dosen',
+                'fields' => [
+                    ['id' => 'q1', 'label' => 'No Urut', 'type' => 'number', 'required' => true],
+                    ['id' => 'q2', 'label' => 'Aspek / Bidang', 'type' => 'text', 'required' => true],
+                    ['id' => 'q3', 'label' => 'Kelebihan', 'type' => 'textarea', 'required' => true],
+                    ['id' => 'q4', 'label' => 'Peluang untuk Peningkatan', 'type' => 'textarea', 'required' => true],
+                    ['id' => 'q5', 'label' => 'Tanggal Audit', 'type' => 'text', 'required' => false],
+                ],
+            ],
+        ];
+
+        $forms = [];
+        foreach ($specs as $spec) {
+            $form = DataForm::query()->updateOrCreate(
+                ['code' => $spec['code']],
+                [
+                    'id_kategori' => $amiCategory->id,
+                    'judul' => $spec['judul'],
+                    'deskripsi' => $spec['deskripsi'],
+                    'tanggal_waktu' => now()->addDays(45),
+                    'status_aktif' => true,
+                    'tahun' => $spec['tahun'],
+                    'periode' => $spec['periode'],
+                    'target' => $spec['target'],
+                    'dibuat_oleh' => $creatorId,
+                ]
+            );
+            $form->syncFields($spec['fields']);
+            $forms[$spec['code']] = $form;
+        }
+
+        return $forms;
+    }
+
+    /**
+     * Bulk insert form submissions and normalized data_isian rows in small SQL-safe chunks.
+     *
+     * @param  array<int, array<string, string>>  $rows
+     */
+    protected function bulkImportFormRows(
+        DataForm $form,
+        array $rows,
+        string $codePrefix,
+        ?int $submitterId,
+        DataQualityService $quality
+    ): int {
+        if (empty($rows)) {
+            return 0;
+        }
+
+        $form->loadMissing('kolomFormulir');
+        $fieldsByCode = [];
+        foreach ($form->kolomFormulir as $col) {
+            $fieldsByCode[$col->kode_kolom] = [
+                'model' => $col,
+                'def' => $col->toFieldArray(),
+            ];
+        }
+
+        $now = now();
+        $submissionInserts = [];
+        $valuesByCode = [];
+
+        foreach (array_values($rows) as $idx => $rowValues) {
+            $subCode = sprintf('%s%03d', $codePrefix, $idx + 1);
+            $submissionInserts[] = [
+                'code' => $subCode,
+                'id_formulir' => $form->id,
+                'diisi_oleh' => $submitterId,
+                'waktu_pengisian' => $now,
+                'jalur_berkas_bukti' => null,
+                'dibersihkan_oleh' => null,
+                'waktu_dibersihkan' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+            $valuesByCode[$subCode] = $rowValues;
+        }
+
+        foreach (array_chunk($submissionInserts, 100) as $chunk) {
+            FormSubmission::query()->insert($chunk);
+        }
+
+        $submissionIds = FormSubmission::query()
+            ->where('id_formulir', $form->id)
+            ->pluck('id', 'code')
+            ->all();
+
+        $dataIsianInserts = [];
+        foreach ($valuesByCode as $subCode => $rowValues) {
+            $subId = $submissionIds[$subCode] ?? null;
+            if ($subId === null) {
+                continue;
+            }
+
+            foreach ($fieldsByCode as $kodeKolom => $entry) {
+                $raw = (string) ($rowValues[$kodeKolom] ?? '');
+                $normalized = $quality->normalizeValue($entry['def'], $raw);
+                $dataIsianInserts[] = [
+                    'id_pengisian' => $subId,
+                    'id_kolom' => $entry['model']->id,
+                    'nilai' => $normalized,
+                    'status_bersih' => true,
+                    'jalur_berkas' => null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+        }
+
+        foreach (array_chunk($dataIsianInserts, 100) as $chunk) {
+            SubmissionValue::query()->insert($chunk);
+        }
+
+        return count($dataIsianInserts);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $indicators
+     * @return array<int, array<string, string>>
+     */
+    protected function mapIndicatorSubmissionRows(array $indicators): array
+    {
+        return array_map(static fn (array $r): array => [
+            'q1' => (string) $r['code'],
+            'q2' => (string) $r['kelompok_standar'],
+            'q3' => (string) $r['standar_nomor'],
+            'q4' => (string) $r['standar_nama'],
+            'q5' => (string) ($r['no_butir'] ?? ''),
+            'q6' => (string) $r['indikator'],
+            'q7' => (string) ($r['baseline_2023'] ?? ''),
+            'q8' => (string) ($r['baseline_2024'] ?? ''),
+            'q9' => (string) ($r['target_akhir'] ?? ''),
+            'q10' => (string) ($r['realisasi'] ?? ''),
+            'q11' => (string) ($r['link_bukti'] ?? ''),
+            'q12' => (string) ($r['konfirmasi_auditor'] ?? ''),
+            'q13' => (string) ($r['status'] ?? ''),
+            'q14' => $r['capaian'] !== null ? (string) round((float) $r['capaian'], 4) : '',
+        ], $indicators);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $ptkFindings
+     * @return array<int, array<string, string>>
+     */
+    protected function mapPtkSubmissionRows(array $ptkFindings): array
+    {
+        $jenisLabel = static fn (string $jenis): string => match ($jenis) {
+            'borang_lam' => 'PTK Borang LAM',
+            'standar_28' => 'PTK 28 Standar',
+            'bank_dokumen' => 'PTK Bank Dokumen',
+            default => 'PTK 28 Standar',
+        };
+
+        $out = [];
+        foreach (array_values($ptkFindings) as $idx => $p) {
+            $out[] = [
+                'q1' => sprintf('PTK-%03d', $idx + 1),
+                'q2' => $jenisLabel((string) $p['jenis_ptk']),
+                'q3' => trim((string) ($p['tahun_akademik'] ?? '')) ?: '2023-2024',
+                'q4' => (string) ($p['no_temuan'] ?? ''),
+                'q5' => (string) ($p['kriteria_atau_standar'] ?? ''),
+                'q6' => (string) ($p['tanggal_temuan'] ?? ''),
+                'q7' => trim((string) ($p['uraian'] ?? '')) ?: '-',
+                'q8' => (string) ($p['kategori'] ?? ''),
+                'q9' => (string) ($p['analisis_penyebab'] ?? ''),
+                'q10' => (string) ($p['tindakan_koreksi'] ?? ''),
+                'q11' => (string) ($p['rencana_selesai'] ?? ''),
+                'q12' => (string) ($p['status'] ?? ''),
+                'q13' => (string) ($p['link_bukti'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $recommendations
+     * @return array<int, array<string, string>>
+     */
+    protected function mapRecommendationSubmissionRows(array $recommendations): array
+    {
+        return array_map(static fn (array $r): array => [
+            'q1' => (string) $r['no_urut'],
+            'q2' => trim((string) $r['aspek_bidang']) ?: 'Umum',
+            'q3' => trim((string) $r['kelebihan']) ?: '-',
+            'q4' => trim((string) $r['peluang_peningkatan']) ?: '-',
+            'q5' => (string) ($r['tanggal_audit'] ?? 'Surabaya, 21 September 2026'),
+        ], $recommendations);
+    }
+
+    /**
+     * Build and upsert the 10 structured AMI datasets (DS-13 .. DS-22) linked via id_formulir_sumber.
      *
      * @param  array<string, mixed>  $parsed
+     * @param  array<string, DataForm>  $formsMap
      * @return array<string, Dataset>
      */
-    protected function upsertAmiDatasets(array $parsed, Category $amiCategory, ?int $creatorId): array
-    {
+    protected function upsertAmiDatasets(
+        array $parsed,
+        Category $amiCategory,
+        array $formsMap,
+        ?int $creatorId
+    ): array {
         $indicators = $parsed['indicators'];
         $summaries = $parsed['standard_summaries'];
         $benchmarks = $parsed['benchmarks'];
@@ -472,7 +713,6 @@ class AmiWorkbookImporter
             (string) ($p['konfirmasi_auditor'] ?? ''),
         ], $ptkFindings);
 
-        // Rekap PTK per Tahun Akademik (DS-21)
         $ptkByYear = [];
         foreach ($ptkFindings as $p) {
             $yr = (string) $p['tahun_akademik'];
@@ -527,7 +767,8 @@ class AmiWorkbookImporter
         $datasetSpecs = [
             [
                 'code' => 'DS-13',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-06']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'XLSX',
                 'updated_label' => '21 Sep 2026',
@@ -538,51 +779,56 @@ class AmiWorkbookImporter
             ],
             [
                 'code' => 'DS-14',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-06']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'XLSX',
                 'updated_label' => '21 Sep 2026',
-                'title' => 'Instrumen AMI 28 Standar S1 SI — Standar Pendidikan (Std 1–8)',
+                'title' => 'Instrumen AMI 28 Standar S1 SI - Standar Pendidikan (Std 1–8)',
                 'description' => 'Data lengkap indikator AMI kelompok Standar Pendidikan (Standar 1 s.d. 8) beserta baseline 2023–2024, target, realisasi, tautan bukti, dan konfirmasi auditor.',
                 'cols' => $indicatorCols,
                 'rows' => $pendRows,
             ],
             [
                 'code' => 'DS-15',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-06']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'XLSX',
                 'updated_label' => '21 Sep 2026',
-                'title' => 'Instrumen AMI 28 Standar S1 SI — Standar Penelitian (Std 9–16)',
+                'title' => 'Instrumen AMI 28 Standar S1 SI - Standar Penelitian (Std 9–16)',
                 'description' => 'Data lengkap indikator AMI kelompok Standar Penelitian (Standar 9 s.d. 16) Prodi S1 Sistem Informasi 2025/2026.',
                 'cols' => $indicatorCols,
                 'rows' => $penelRows,
             ],
             [
                 'code' => 'DS-16',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-06']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'XLSX',
                 'updated_label' => '21 Sep 2026',
-                'title' => 'Instrumen AMI 28 Standar S1 SI — Standar PkM (Std 17–24)',
+                'title' => 'Instrumen AMI 28 Standar S1 SI - Standar PkM (Std 17–24)',
                 'description' => 'Data lengkap indikator AMI kelompok Standar Pengabdian kepada Masyarakat (Standar 17 s.d. 24) Prodi S1 Sistem Informasi 2025/2026.',
                 'cols' => $indicatorCols,
                 'rows' => $pkmRows,
             ],
             [
                 'code' => 'DS-17',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-06']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'XLSX',
                 'updated_label' => '21 Sep 2026',
-                'title' => 'Instrumen AMI 28 Standar S1 SI — Standar Tambahan Institusi (Std 25–38)',
+                'title' => 'Instrumen AMI 28 Standar S1 SI - Standar Tambahan Institusi (Std 25–38)',
                 'description' => 'Data lengkap indikator AMI kelompok Standar Tambahan UNUSA (Standar 25 s.d. 38) Prodi S1 Sistem Informasi 2025/2026.',
                 'cols' => $indicatorCols,
                 'rows' => $tambahanRows,
             ],
             [
                 'code' => 'DS-18',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-06']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'XLSX',
                 'updated_label' => '21 Sep 2026',
@@ -593,7 +839,8 @@ class AmiWorkbookImporter
             ],
             [
                 'code' => 'DS-19',
-                'tahun' => 2024,
+                'source_form_id' => $formsMap['F-06']->id,
+                'tahun' => '2024',
                 'periode' => 'Genap',
                 'format' => 'XLSX',
                 'updated_label' => '15 Agu 2024',
@@ -604,7 +851,8 @@ class AmiWorkbookImporter
             ],
             [
                 'code' => 'DS-20',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-07']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'XLSX',
                 'updated_label' => '21 Sep 2026',
@@ -615,7 +863,8 @@ class AmiWorkbookImporter
             ],
             [
                 'code' => 'DS-21',
-                'tahun' => 2025,
+                'source_form_id' => $formsMap['F-07']->id,
+                'tahun' => '2025',
                 'periode' => 'Ganjil',
                 'format' => 'CSV',
                 'updated_label' => '21 Sep 2026',
@@ -626,7 +875,8 @@ class AmiWorkbookImporter
             ],
             [
                 'code' => 'DS-22',
-                'tahun' => 2026,
+                'source_form_id' => $formsMap['F-08']->id,
+                'tahun' => '2026',
                 'periode' => 'Ganjil',
                 'format' => 'CSV',
                 'updated_label' => '21 Sep 2026',
@@ -642,18 +892,18 @@ class AmiWorkbookImporter
             $saved[$spec['code']] = Dataset::query()->updateOrCreate(
                 ['code' => $spec['code']],
                 [
-                    'category_id' => $amiCategory->id,
-                    'source_form_id' => null,
-                    'title' => $spec['title'],
-                    'description' => $spec['description'],
-                    'tahun' => $spec['tahun'],
+                    'id_kategori' => $amiCategory->id,
+                    'id_formulir_sumber' => $spec['source_form_id'],
+                    'judul' => $spec['title'],
+                    'deskripsi' => $spec['description'],
+                    'tahun' => (string) $spec['tahun'],
                     'periode' => $spec['periode'],
-                    'access' => 'public',
+                    'tipe_akses' => 'public',
                     'format' => $spec['format'],
-                    'updated_label' => $spec['updated_label'],
-                    'cols' => $spec['cols'],
-                    'rows' => $spec['rows'],
-                    'created_by' => $creatorId,
+                    'label_diperbarui' => $spec['updated_label'],
+                    'kolom' => $spec['cols'],
+                    'baris' => $spec['rows'],
+                    'dibuat_oleh' => $creatorId,
                 ]
             );
         }
@@ -700,43 +950,23 @@ class AmiWorkbookImporter
             Visualization::query()->updateOrCreate(
                 ['code' => $spec['code']],
                 [
-                    'title' => $spec['title'],
-                    'dataset_id' => $ds->id,
-                    'label_col' => $spec['label_col'],
-                    'value_col' => $spec['value_col'],
-                    'kind' => $spec['kind'],
-                    'color' => $spec['color'],
-                    'show' => $spec['show'],
-                    'created_by' => $creatorId,
+                    'judul' => $spec['title'],
+                    'id_dataset' => $ds->id,
+                    'tipe_grafik' => $spec['kind'],
+                    'konfigurasi_query' => [
+                        'mode' => 'dataset',
+                        'label_col' => $spec['label_col'],
+                        'value_col' => $spec['value_col'],
+                        'color' => $spec['color'],
+                        'show' => $spec['show'],
+                    ],
+                    'dibuat_oleh' => $creatorId,
                 ]
             );
             $count++;
         }
 
         return $count;
-    }
-
-    /**
-     * Upsert the Daftar Tilik Audit Mutu Internal DataForm (F-05).
-     *
-     * @param  array<int, array<string, mixed>>  $fields
-     */
-    protected function upsertChecklistForm(array $fields, Category $amiCategory, ?int $creatorId): DataForm
-    {
-        return DataForm::query()->updateOrCreate(
-            ['code' => 'F-05'],
-            [
-                'category_id' => $amiCategory->id,
-                'title' => 'Daftar Tilik Audit Mutu Internal (LAM & 28 Standar)',
-                'description' => 'Instrumen pencatatan pertanyaan auditor, hasil observasi/visitasi, kesesuaian (S/TS), catatan khusus, saran, dan kesimpulan AMI Prodi S1 Sistem Informasi.',
-                'tahun' => 2026,
-                'periode' => 'Ganjil',
-                'target' => 'Dosen',
-                'deadline' => now()->addDays(45),
-                'fields' => $fields,
-                'created_by' => $creatorId,
-            ]
-        );
     }
 
     /**
@@ -807,7 +1037,6 @@ class AmiWorkbookImporter
             $indikatorText = $colD;
             $noButir = $this->normalizeNumberString($colC);
 
-            // Handle continuation sub-rows (e.g., Std 9 No. 10 part 2 & Std 28 P8)
             if ($indikatorText === '') {
                 if (! empty($list) && $list[array_key_last($list)]['standar_nomor'] === $standarNomor) {
                     $prev = $list[array_key_last($list)];
@@ -825,7 +1054,6 @@ class AmiWorkbookImporter
 
             $realisasiClean = $this->normalizeMetricCell($colN);
             if (is_numeric($realisasiClean) && (float) $realisasiClean > 40000 && (float) $realisasiClean < 50000 && $standarNomor === 21) {
-                // Workbook date formatted numeric cell like 2026-08-08 serial
                 $realisasiClean = $this->formatExcelDateOrRaw($realisasiClean) ?? $realisasiClean;
             }
 
@@ -1096,7 +1324,6 @@ class AmiWorkbookImporter
             $colL = $this->cleanText($cells[11] ?? '');
             $colM = $this->cleanText($cells[12] ?? '');
 
-            // Stop when footer signature block starts
             if (
                 stripos($colD, 'Ketua KPMPI') !== false
                 || stripos($colH, 'Surabaya,') !== false

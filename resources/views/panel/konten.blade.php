@@ -208,16 +208,16 @@
                         @if($p->foto)
                             <img src="{{ $p->foto }}" alt="{{ $p->judul }}" class="h-14 w-14 shrink-0 rounded-xl border border-slate-200 object-cover" />
                         @else
-                            <span class="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+                            <span class="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#F0F9FF] text-[#0069A8]">
                                 <i data-lucide="trophy" class="h-6 w-6"></i>
                             </span>
                         @endif
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-mono text-[11px] font-bold text-sky-700">{{ $p->code }}</span>
+                                <span class="font-mono text-[11px] font-bold text-[#0069A8]">{{ $p->code }}</span>
                                 <span class="rounded-md px-2 py-0.5 text-[11px] font-bold {{ $tingkatClass($p->tingkat) }}">{{ $p->tingkat }}</span>
                                 <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">{{ $p->peringkat }}</span>
-                                <span class="text-xs text-slate-400">{{ $p->tahun }}</span>
+                                <span class="text-xs text-slate-500">{{ $p->tahun }}</span>
                             </div>
                             <h3 class="mt-1 truncate text-sm font-bold text-slate-900">{{ $p->judul }}</h3>
                             <p class="text-xs text-slate-600">{{ $p->nama }}</p>
@@ -401,7 +401,7 @@
 
     <!-- Lecturer Modal -->
     <template x-if="modalType === 'dosen'">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/40 backdrop-blur-sm sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
             <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div>
@@ -472,7 +472,7 @@
 
     <!-- Achievement Modal -->
     <template x-if="modalType === 'prestasi'">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/40 backdrop-blur-sm sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
             <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div>
@@ -527,7 +527,7 @@
 
     <!-- News Modal -->
     <template x-if="modalType === 'berita'">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/40 backdrop-blur-sm sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
             <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div>
@@ -595,7 +595,7 @@
 
     <!-- Course Modal -->
     <template x-if="modalType === 'kurikulum'">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/40 backdrop-blur-sm sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="modalType = null" @keydown.escape.window="modalType = null">
             <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div>

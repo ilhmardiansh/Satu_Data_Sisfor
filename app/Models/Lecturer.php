@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Lecturer extends Model
 {
+    protected $table = 'dosen';
+
     public const JABATAN_OPTIONS = [
         'Tenaga Pengajar',
         'Asisten Ahli',
@@ -22,15 +26,17 @@ class Lecturer extends Model
     protected $fillable = [
         'code',
         'nama',
+        'gelar',
+        'jalur_foto',
         'nidn',
         'jabatan',
         'pendidikan',
         'bidang',
-        'foto',
         'email',
         'mata_kuliah',
         'profil',
-        'sort_order',
+        'urutan',
+        'dikelola_oleh',
     ];
 
     /**
@@ -39,8 +45,23 @@ class Lecturer extends Model
     protected function casts(): array
     {
         return [
-            'sort_order' => 'integer',
+            'urutan' => 'integer',
         ];
+    }
+
+    protected function foto(): Attribute
+    {
+        return Attribute::make(get: fn (): ?string => $this->jalur_foto);
+    }
+
+    protected function sortOrder(): Attribute
+    {
+        return Attribute::make(get: fn (): int => (int) $this->urutan);
+    }
+
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'dikelola_oleh');
     }
 
     public function initials(): string

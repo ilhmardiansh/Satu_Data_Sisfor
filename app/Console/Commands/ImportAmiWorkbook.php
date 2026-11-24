@@ -21,7 +21,7 @@ class ImportAmiWorkbook extends Command
      *
      * @var string
      */
-    protected $description = 'Impor seluruh data AMI SNPT-U (28 & 38 Standar, Benchmark, PTK, Saran) beserta datasetnya ke database.';
+    protected $description = 'Impor data Excel AMI SNPT-U ke formulir, pengisian_formulir, data_isian, dataset, dan visualisasi DPPL.';
 
     public function handle(AmiWorkbookImporter $importer): int
     {
@@ -43,13 +43,13 @@ class ImportAmiWorkbook extends Command
         $stats = $importer->importIntoDatabase($xlsxPath, null, null);
 
         $this->table(
-            ['Entitas', 'Jumlah Diimpor'],
+            ['Entitas DPPL', 'Jumlah Diimpor'],
             [
-                ['Indikator AMI 28 Standar', $stats['indicators']],
-                ['Rekap 28 Standar', $stats['standard_summaries']],
-                ['Benchmark 38 Standar (16 Prodi)', $stats['benchmarks']],
-                ['Temuan PTK (2018–2026)', $stats['ptk_findings']],
-                ['Saran Pengembangan', $stats['recommendations']],
+                ['Formulir AMI (F-05..F-08)', $stats['forms']],
+                ['Pengisian Indikator 28 Standar (F-06)', $stats['indicators_submissions']],
+                ['Pengisian Temuan PTK (F-07)', $stats['ptk_submissions']],
+                ['Pengisian Saran Pengembangan (F-08)', $stats['recommendation_submissions']],
+                ['Total Baris Data Isian (data_isian)', $stats['data_isian']],
                 ['Dataset Katalog AMI (DS-13..DS-22)', $stats['datasets']],
                 ['Visualisasi Dashboard (V-04..V-05)', $stats['visualizations']],
             ]

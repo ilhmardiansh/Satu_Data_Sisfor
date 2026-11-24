@@ -2,23 +2,32 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DataForm extends Model
 {
+    protected $table = 'formulir';
+
     protected $fillable = [
         'code',
-        'category_id',
-        'title',
-        'description',
+        'id_kategori',
+        'judul',
+        'deskripsi',
+        'tanggal_waktu',
+        'status_aktif',
         'tahun',
         'periode',
         'target',
-        'deadline',
-        'fields',
-        'created_by',
+        'batasi_satu_respon',
+        'status_preprocessing',
+        'ringkasan_preprocessing',
+        'diproses_oleh',
+        'waktu_diproses',
+        'dibuat_oleh',
     ];
 
     /**
@@ -28,34 +37,182 @@ class DataForm extends Model
     {
         return [
             'tahun' => 'integer',
-            'deadline' => 'datetime',
-            'fields' => 'array',
+            'tanggal_waktu' => 'datetime',
+            'status_aktif' => 'boolean',
+            'batasi_satu_respon' => 'boolean',
+            'ringkasan_preprocessing' => 'array',
+            'waktu_diproses' => 'datetime',
         ];
+    }
+
+    protected function categoryId(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): int => (int) $this->id_kategori,
+        );
+    }
+
+    protected function title(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => (string) $this->judul,
+        );
+    }
+
+    protected function description(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => $this->deskripsi,
+        );
+    }
+
+    protected function deadline(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->tanggal_waktu,
+        );
+    }
+
+    protected function createdBy(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?int => $this->dibuat_oleh !== null ? (int) $this->dibuat_oleh : null,
+        );
+    }
+
+    protected function fields(): Attribute
+    {
+        return Attribute::make(
+            get: function (): array {
+                $this->loadMissing('kolomFormulir');
+
+                return $this->kolomFormulir
+                    ->map(fn (FormField $col): array => $col->toFieldArray())
+                    ->values()
+                    ->all();
+            },
+        );
     }
 
     public function category(): BelongsTo
     {
-        return $this->belongsTo(Category::class);
+        return $this->belongsTo(Category::class, 'id_kategori');
     }
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'dibuat_oleh');
+    }
+
+    public function processor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'diproses_oleh');
+    }
+
+    public function kolomFormulir(): HasMany
+    {
+        return $this->hasMany(FormField::class, 'id_formulir')
+            ->orderBy('urutan')
+            ->orderBy('id');
     }
 
     public function submissions(): HasMany
     {
-        return $this->hasMany(FormSubmission::class, 'data_form_id');
+        return $this->hasMany(FormSubmission::class, 'id_formulir');
     }
 
     public function datasets(): HasMany
     {
-        return $this->hasMany(Dataset::class, 'source_form_id');
+        return $this->hasMany(Dataset::class, 'id_formulir_sumber');
+    }
+
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query
+            ->where('status_aktif', true)
+            ->where('tanggal_waktu', '>', now());
+    }
+
+    public function scopeClosed(Builder $query): Builder
+    {
+        return $query->where(function (Builder $sub): void {
+            $sub->where('status_aktif', false)
+                ->orWhere('tanggal_waktu', '<=', now());
+        });
+    }
+
+    /**
+     * Synchronize normalized kolom_formulir rows while preserving existing IDs when editing.
+     *
+     * @param  array<int, array<string, mixed>>  $fields
+     */
+    public function syncFields(array $fields): void
+    {
+        $existing = $this->kolomFormulir()->get()->keyBy('kode_kolom');
+        $keptCodes = [];
+
+        foreach (array_values($fields) as $index => $item) {
+            $code = trim((string) ($item['id'] ?? '')) ?: 'q'.($index + 1);
+            $type = (string) ($item['type'] ?? 'text');
+            $hasOptions = in_array($type, ['select', 'radio', 'checkbox'], true);
+            $options = $hasOptions
+                ? array_values(array_filter(array_map('trim', array_map('strval', $item['options'] ?? []))))
+                : null;
+            $helpText = trim((string) ($item['help'] ?? ''));
+
+            $payload = [
+                'id_formulir' => $this->id,
+                'kode_kolom' => $code,
+                'label' => trim((string) ($item['label'] ?? $code)),
+                'deskripsi_bantuan' => $helpText !== '' ? $helpText : null,
+                'tipe_kolom' => $type,
+                'wajib_diisi' => (bool) ($item['required'] ?? false),
+                'opsi' => $options ?: null,
+                'urutan' => $index + 1,
+            ];
+
+            if ($existing->has($code)) {
+                $existing->get($code)->update($payload);
+            } else {
+                FormField::create($payload);
+            }
+
+            $keptCodes[] = $code;
+        }
+
+        if (empty($keptCodes)) {
+            $this->kolomFormulir()->delete();
+        } else {
+            $this->kolomFormulir()->whereNotIn('kode_kolom', $keptCodes)->delete();
+        }
+
+        $this->load('kolomFormulir');
+    }
+
+    public function tutupFormulir(): void
+    {
+        $this->update(['status_aktif' => false]);
     }
 
     public function isOpen(): bool
     {
-        return $this->deadline !== null && $this->deadline->isFuture();
+        return (bool) $this->status_aktif
+            && $this->tanggal_waktu !== null
+            && $this->tanggal_waktu->isFuture();
+    }
+
+    public function isPreprocessed(): bool
+    {
+        return $this->status_preprocessing === 'siap';
+    }
+
+    public function preprocessingStatusLabel(): string
+    {
+        return match ($this->status_preprocessing) {
+            'siap' => 'Siap Dataset',
+            'proses' => 'Perlu Pre-processing',
+            default => 'Belum Diproses',
+        };
     }
 
     public function canBeSeenBy(?User $user): bool
@@ -64,7 +221,7 @@ class DataForm extends Model
             return false;
         }
 
-        if ($user->role !== 'produsen') {
+        if ($user->isAdmin() || $user->isWali()) {
             return true;
         }
 
@@ -77,18 +234,18 @@ class DataForm extends Model
             return false;
         }
 
-        $seconds = now()->diffInSeconds($this->deadline, false);
+        $seconds = now()->diffInSeconds($this->tanggal_waktu, false);
 
         return $seconds > 0 && $seconds < 3 * 86400;
     }
 
     public function timeLeftLabel(string $lang = 'id'): string
     {
-        if (! $this->deadline) {
+        if (! $this->isOpen()) {
             return $lang === 'en' ? 'Closed' : 'Ditutup';
         }
 
-        $seconds = now()->diffInSeconds($this->deadline, false);
+        $seconds = now()->diffInSeconds($this->tanggal_waktu, false);
 
         if ($seconds <= 0) {
             return $lang === 'en' ? 'Closed' : 'Ditutup';
@@ -107,11 +264,11 @@ class DataForm extends Model
 
     public function deadlineFormatted(): string
     {
-        if (! $this->deadline) {
+        if (! $this->tanggal_waktu) {
             return '-';
         }
 
-        return $this->deadline->copy()->locale('id')->translatedFormat('j M Y, H.i');
+        return $this->tanggal_waktu->copy()->locale('id')->translatedFormat('j M Y, H.i');
     }
 
     /**
