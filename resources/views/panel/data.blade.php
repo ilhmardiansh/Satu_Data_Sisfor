@@ -3,8 +3,12 @@
 @section('title', 'Pre-processing Data - Panel Satu Data UNUSA')
 
 @section('panel_content')
-<div x-data="collectedDataManager()">
+<div x-data="collectedDataManager(@js($activeForm?->fields[0]['id'] ?? ''))">
     <x-panel-head
+        eyebrow="TAHAP 03 · KURASI & PEMBERSIHAN WAJIB"
+        scene="preprocessing"
+        :badge="$activeForm ? $activeForm->preprocessingStatusLabel() : null"
+        :badgeTone="$activeForm?->isPreprocessed() ? 'emerald' : ($problemCount > 0 ? 'amber' : 'sky')"
         title="Pre-processing Data"
         desc="Pemeriksaan kualitas, normalisasi format, deduplikasi, dan penanganan nilai kosong wajib diselesaikan sebelum data dikemas menjadi dataset."
     >
@@ -12,12 +16,12 @@
             <button
                 type="button"
                 @click="importOpen = true"
-                class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
             >
                 <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>
                 Impor CSV / XLSX GForm
             </button>
-            <a href="{{ route('panel.preprocessing.csv', $activeForm->code) }}" class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+            <a href="{{ route('panel.preprocessing.csv', $activeForm->code) }}" class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20">
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>
                 Unduh CSV
             </a>
@@ -26,7 +30,7 @@
                 <button
                     type="submit"
                     {{ ($problemCount > 0 || $profile['active_count'] === 0) ? 'disabled' : '' }}
-                    class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#182654] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0069A8] disabled:cursor-not-allowed disabled:opacity-45"
+                    class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                     <i data-lucide="check-check" class="h-4 w-4" aria-hidden="true"></i>
                     Finalisasi Pre-processing
@@ -36,7 +40,7 @@
                 type="button"
                 @click="openBuilder({{ $activeForm->id }})"
                 {{ (! $activeForm->isPreprocessed() || $profile['valid'] === 0) ? 'disabled' : '' }}
-                class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#0069A8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#182654] disabled:cursor-not-allowed disabled:opacity-45"
+                class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8] disabled:cursor-not-allowed disabled:opacity-45"
             >
                 <i data-lucide="table-2" class="h-4 w-4" aria-hidden="true"></i>
                 Susun Dataset
@@ -44,100 +48,151 @@
         @endif
     </x-panel-head>
 
-    <!-- Filter Formulir & Pencarian -->
-    <form method="GET" action="{{ route('panel.preprocessing') }}" class="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-[#F6F9FC] p-3">
-        <select name="kategori" onchange="this.form.submit()" aria-label="Kategori" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-[#0069A8]">
-            <option value="all">Semua kategori</option>
-            @foreach($filterCategories as $c)
-                <option value="{{ $c->code }}" {{ $kategori === $c->code ? 'selected' : '' }}>{{ $c->name }}</option>
-            @endforeach
-        </select>
+    <!-- Bar Navigasi Formulir Aktif & Pencarian Baris -->
+    <div class="wd-bento mb-5 flex flex-wrap items-center justify-between gap-3 p-4">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <a href="{{ route('panel.preprocessing') }}"
+               class="inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:border-[#0069A8] hover:bg-[#F0F9FF] hover:text-[#0069A8]">
+                <i data-lucide="arrow-left" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                Pilih Formulir Lain
+            </a>
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="rounded-md bg-[#F0F9FF] px-2 py-0.5 font-mono text-[11px] font-bold text-[#0069A8]">{{ $activeForm->code }}</span>
+                    <span class="text-xs font-medium text-[#475569]">{{ $activeForm->category?->name ?? 'Umum' }} · {{ $activeForm->tahun }} · {{ $activeForm->periode }}</span>
+                </div>
+                <p class="mt-0.5 truncate text-sm font-extrabold text-slate-900">{{ $activeForm->title }}</p>
+            </div>
+        </div>
 
-        <select name="tahun" onchange="this.form.submit()" aria-label="Tahun" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-[#0069A8]">
-            <option value="all">Semua tahun</option>
-            @foreach($years as $y)
-                <option value="{{ $y }}" {{ $tahun === (string) $y ? 'selected' : '' }}>{{ $y }}</option>
-            @endforeach
-        </select>
-
-        <select name="form" onchange="this.form.submit()" aria-label="Formulir" class="h-10 min-w-[200px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#0069A8]">
-            @forelse($filteredForms as $fx)
-                <option value="{{ $fx->code }}" {{ $activeForm?->id === $fx->id ? 'selected' : '' }}>
-                    {{ $fx->code }} · {{ $fx->title }} ({{ $fx->submissions_count }} respons)
-                </option>
-            @empty
-                <option value="">Belum ada formulir</option>
-            @endforelse
-        </select>
-
-        <label class="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-            <i data-lucide="search" class="h-4 w-4 text-[#475569]" aria-hidden="true"></i>
-            <input type="text" name="q" value="{{ $q }}" placeholder="Cari pengisi atau nilai..." class="w-40 bg-transparent text-sm outline-none" />
-        </label>
-
-        @if($status !== 'all')
-            <input type="hidden" name="status" value="{{ $status }}">
-        @endif
-    </form>
+        <form method="GET" action="{{ route('panel.preprocessing.show', $activeForm->code) }}" class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            @if($status !== 'all')
+                <input type="hidden" name="status" value="{{ $status }}">
+            @endif
+            <label class="flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 focus-within:border-[#0069A8] focus-within:bg-white sm:w-64">
+                <i data-lucide="search" class="h-4 w-4 text-[#475569]" aria-hidden="true"></i>
+                <input type="text" name="q" value="{{ $q }}" placeholder="Cari pengisi, NIM, atau isi..." class="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+            </label>
+            <button type="submit" class="inline-flex h-10 items-center rounded-xl bg-[#0069A8] px-3.5 text-xs font-bold text-white transition hover:bg-[#182654]">
+                Cari
+            </button>
+            @if($q !== '')
+                <a href="{{ route('panel.preprocessing.show', $status !== 'all' ? ['dataForm' => $activeForm->code, 'status' => $status] : $activeForm->code) }}"
+                   class="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    Reset
+                </a>
+            @endif
+        </form>
+    </div>
 
     @if($activeForm)
-        <!-- Banner Status Pipeline & Ringkasan Kuantitatif -->
-        <section class="mb-5 rounded-2xl border p-5 {{ $activeForm->isPreprocessed() ? 'border-emerald-200 bg-[#ECFDF5]' : ($problemCount > 0 ? 'border-red-200 bg-[#FEF2F2]' : 'border-amber-200 bg-[#FFFBEB]') }}">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="rounded-md bg-white px-2.5 py-0.5 font-mono text-xs font-bold text-[#182654] ring-1 ring-slate-200">{{ $activeForm->code }}</span>
-                        <span class="rounded-md px-2.5 py-0.5 text-xs font-bold {{ $activeForm->isPreprocessed() ? 'bg-white text-[#047857]' : 'bg-white text-[#92400E]' }}">
-                            {{ $activeForm->preprocessingStatusLabel() }}
-                        </span>
-                    </div>
-                    <h2 class="mt-2 text-lg font-extrabold text-slate-900">
-                        @if($activeForm->isPreprocessed())
-                            Data siap dikemas menjadi Dataset ({{ $profile['valid'] }} baris valid)
-                        @elseif($totalSubmissionsCount === 0)
-                            Belum ada respons masuk untuk diproses
-                        @elseif($problemCount > 0)
-                            {{ $problemCount }} dari {{ $profile['active_count'] }} baris aktif memerlukan pembersihan
-                        @else
-                            Seluruh {{ $profile['active_count'] }} baris aktif bersih · klik Finalisasi Pre-processing untuk membuka tahap Dataset
-                        @endif
-                    </h2>
-                    <p class="mt-1 text-sm text-[#475569]">
-                        Alur: <strong class="text-slate-900">Respons Mentah</strong> -> <strong class="text-slate-900">Normalisasi &amp; Deduplikasi &amp; Missing Value</strong> -> <strong class="text-slate-900">Finalisasi Pre-processing</strong> -> <strong class="text-slate-900">Susun Dataset</strong>.
-                    </p>
-                </div>
+        @php
+            $cleanRate = $profile['active_count'] > 0
+                ? (int) round((max(0, $profile['active_count'] - $problemCount) / $profile['active_count']) * 100)
+                : 0;
+            $stepperActive = $activeForm->isPreprocessed() ? 4 : ($totalSubmissionsCount > 0 ? ($problemCount === 0 ? 3 : 2) : 1);
+            $r = 26;
+            $circ = round(2 * M_PI * $r, 2);
+            $off = round($circ * (1 - ($cleanRate / 100)), 2);
+        @endphp
 
-                <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div class="rounded-xl bg-white px-3.5 py-2.5 text-center ring-1 ring-slate-200/80">
-                        <dt class="text-[11px] font-semibold text-[#475569]">Mentah</dt>
-                        <dd class="mt-0.5 text-lg font-extrabold tabular-nums text-[#92400E]">{{ $profile['mentah'] }}</dd>
+        <!-- Banner Status Pipeline & 4-Step Visual Stepper -->
+        <section class="wd-bento mb-5 overflow-hidden">
+            <div class="border-b px-5 py-5 {{ $activeForm->isPreprocessed() ? 'border-emerald-200 bg-[#ECFDF5]/80' : ($problemCount > 0 ? 'border-red-200 bg-[#FEF2F2]/80' : 'border-amber-200 bg-[#FFFBEB]/80') }}">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex min-w-0 flex-1 items-center gap-4">
+                        <!-- Mini Clean-Rate Radial -->
+                        <div class="relative hidden h-16 w-16 shrink-0 place-items-center sm:grid">
+                            <svg class="h-16 w-16 -rotate-90" viewBox="0 0 64 64" aria-hidden="true">
+                                <circle cx="32" cy="32" r="{{ $r }}" fill="none" stroke="rgba(15,23,42,0.1)" stroke-width="5.5" />
+                                <circle cx="32" cy="32" r="{{ $r }}" fill="none" stroke="{{ $activeForm->isPreprocessed() ? '#047857' : ($problemCount > 0 ? '#B91C1C' : '#0069A8') }}" stroke-width="5.5" stroke-linecap="round" stroke-dasharray="{{ $circ }}" stroke-dashoffset="{{ $totalSubmissionsCount > 0 ? $off : $circ }}" />
+                            </svg>
+                            <span class="absolute font-mono text-xs font-extrabold tabular-nums text-slate-900">
+                                {{ $totalSubmissionsCount > 0 ? $cleanRate.'%' : '0%' }}
+                            </span>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-md bg-white px-2.5 py-0.5 font-mono text-xs font-bold text-[#182654] ring-1 ring-slate-200">{{ $activeForm->code }}</span>
+                                <span class="rounded-md bg-white px-2.5 py-0.5 text-xs font-bold ring-1 ring-slate-200/70 {{ $activeForm->isPreprocessed() ? 'text-[#047857]' : 'text-[#92400E]' }}">
+                                    {{ $activeForm->preprocessingStatusLabel() }}
+                                </span>
+                            </div>
+                            <h2 class="mt-1.5 text-lg font-extrabold tracking-tight text-slate-900">
+                                @if($activeForm->isPreprocessed())
+                                    Data siap dikemas menjadi Dataset ({{ $profile['valid'] }} baris valid)
+                                @elseif($totalSubmissionsCount === 0)
+                                    Belum ada respons masuk untuk diproses
+                                @elseif($problemCount > 0)
+                                    {{ $problemCount }} dari {{ $profile['active_count'] }} baris aktif memerlukan pembersihan
+                                @else
+                                    Seluruh {{ $profile['active_count'] }} baris aktif bersih · klik Finalisasi Pre-processing untuk membuka tahap Dataset
+                                @endif
+                            </h2>
+                        </div>
                     </div>
-                    <div class="rounded-xl bg-white px-3.5 py-2.5 text-center ring-1 ring-slate-200/80">
-                        <dt class="text-[11px] font-semibold text-[#475569]">Bermasalah</dt>
-                        <dd class="mt-0.5 text-lg font-extrabold tabular-nums text-[#B91C1C]">{{ $profile['issue_rows'] }}</dd>
+
+                    <dl class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                        <div class="rounded-xl bg-white px-3.5 py-2 text-center ring-1 ring-slate-200/80">
+                            <dt class="text-[11px] font-semibold text-[#475569]">Mentah</dt>
+                            <dd class="mt-0.5 font-mono text-lg font-extrabold tabular-nums text-[#92400E]">{{ $profile['mentah'] }}</dd>
+                        </div>
+                        <div class="rounded-xl bg-white px-3.5 py-2 text-center ring-1 ring-slate-200/80">
+                            <dt class="text-[11px] font-semibold text-[#475569]">Bermasalah</dt>
+                            <dd class="mt-0.5 font-mono text-lg font-extrabold tabular-nums text-[#B91C1C]">{{ $profile['issue_rows'] }}</dd>
+                        </div>
+                        <div class="rounded-xl bg-white px-3.5 py-2 text-center ring-1 ring-slate-200/80">
+                            <dt class="text-[11px] font-semibold text-[#475569]">Valid</dt>
+                            <dd class="mt-0.5 font-mono text-lg font-extrabold tabular-nums text-[#047857]">{{ $profile['valid'] }}</dd>
+                        </div>
+                        <div class="rounded-xl bg-white px-3.5 py-2 text-center ring-1 ring-slate-200/80">
+                            <dt class="text-[11px] font-semibold text-[#475569]">Ditolak</dt>
+                            <dd class="mt-0.5 font-mono text-lg font-extrabold tabular-nums text-slate-700">{{ $profile['ditolak'] }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- 4-Step Visual Pipeline Stepper -->
+            <div class="grid grid-cols-2 divide-y divide-slate-100 bg-white text-xs sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+                @foreach([
+                    1 => ['01', 'Respons Mentah', 'Masuk dari GForm / Impor'],
+                    2 => ['02', 'Normalisasi & Dedup', 'Seragamkan & buang ganda'],
+                    3 => ['03', 'Missing Value', 'Imputasi atau tandai ditolak'],
+                    4 => ['04', 'Finalisasi Dataset', 'Buka gerbang susun dataset'],
+                ] as $stepNum => [$code, $label, $sub])
+                    <div class="flex items-center gap-3 px-4 py-3 {{ $stepperActive >= $stepNum ? 'bg-white' : 'bg-[#F8FAFC]/70 opacity-65' }}">
+                        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg font-mono text-[11px] font-extrabold {{ $stepperActive > $stepNum ? 'bg-[#ECFDF5] text-[#047857]' : ($stepperActive === $stepNum ? 'bg-[#0069A8] text-white' : 'bg-slate-200 text-slate-600') }}">
+                            {{ $code }}
+                        </span>
+                        <div class="min-w-0">
+                            <p class="truncate font-bold text-slate-900">{{ $label }}</p>
+                            <p class="truncate text-[11px] text-[#475569]">{{ $sub }}</p>
+                        </div>
                     </div>
-                    <div class="rounded-xl bg-white px-3.5 py-2.5 text-center ring-1 ring-slate-200/80">
-                        <dt class="text-[11px] font-semibold text-[#475569]">Valid</dt>
-                        <dd class="mt-0.5 text-lg font-extrabold tabular-nums text-[#047857]">{{ $profile['valid'] }}</dd>
-                    </div>
-                    <div class="rounded-xl bg-white px-3.5 py-2.5 text-center ring-1 ring-slate-200/80">
-                        <dt class="text-[11px] font-semibold text-[#475569]">Ditolak</dt>
-                        <dd class="mt-0.5 text-lg font-extrabold tabular-nums text-slate-700">{{ $profile['ditolak'] }}</dd>
-                    </div>
-                </dl>
+                @endforeach
             </div>
         </section>
 
         @if($totalSubmissionsCount > 0)
-            <!-- Profiling Kualitas per Kolom -->
-            <section class="mb-5 rounded-2xl border border-slate-200 bg-white p-5">
-                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 class="text-sm font-bold text-slate-900">Profiling Kualitas per Kolom</h3>
-                    <span class="text-xs text-[#475569]">Menghitung {{ $profile['active_count'] }} baris non-ditolak</span>
+            <!-- Profiling Kualitas per Kolom (Collapsible + Smart Target to Langkah C) -->
+            <section class="wd-bento mb-5 p-5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-extrabold text-slate-900">Profiling Kualitas per Kolom</h3>
+                        <p class="text-xs text-[#475569]">Menghitung {{ $profile['active_count'] }} baris non-ditolak</p>
+                    </div>
+                    <button type="button"
+                            @click="profilingExpanded = !profilingExpanded"
+                            class="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-slate-200 bg-[#F8FAFC] px-3 text-xs font-semibold text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">
+                        <span x-text="profilingExpanded ? 'Ringkas' : 'Tampilkan detail'"></span>
+                    </button>
                 </div>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+
+                <div x-show="profilingExpanded" x-transition class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach($profile['columns'] as $colStat)
-                        <div class="rounded-xl border border-slate-200/80 bg-[#F6F9FC] p-3.5">
+                        <div class="rounded-xl border border-slate-200/80 bg-[#F8FAFC] p-3.5">
                             <div class="flex items-start justify-between gap-2">
                                 <p class="truncate text-xs font-bold text-slate-900" title="{{ $colStat['label'] }}">{{ $colStat['label'] }}</p>
                                 <span class="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#0069A8] ring-1 ring-slate-200">{{ $colStat['type'] }}</span>
@@ -151,6 +206,13 @@
                                 <span>Invalid: <strong class="{{ $colStat['invalid'] > 0 ? 'text-[#B91C1C]' : 'text-slate-700' }}">{{ $colStat['invalid'] }}</strong></span>
                                 <span>Unik: <strong class="text-slate-800">{{ $colStat['unique_count'] }}</strong></span>
                             </div>
+                            @if($colStat['missing'] > 0 && ! empty($colStat['id']))
+                                <button type="button"
+                                        @click="targetMissingField(@js($colStat['id']))"
+                                        class="mt-2.5 inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[11px] font-bold text-[#B91C1C] transition hover:bg-red-50">
+                                    Tangani {{ $colStat['missing'] }} kosong →
+                                </button>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -159,18 +221,21 @@
             <!-- Toolbar Aksi Pre-processing (Normalisasi, Deduplikasi, Missing Values) -->
             <section class="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <!-- 1. Normalisasi Batch -->
-                <form method="POST" action="{{ route('panel.preprocessing.normalize', $activeForm->code) }}" class="flex flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                <form method="POST" action="{{ route('panel.preprocessing.normalize', $activeForm->code) }}" class="wd-bento flex flex-col p-5">
                     @csrf
-                    <p class="text-xs font-bold tracking-wide text-[#0069A8] uppercase">Langkah A · Normalisasi</p>
-                    <p class="mt-1 text-xs text-[#475569]">Merapikan spasi ganda, menyeragamkan label pilihan/checkbox, dan menstandarkan angka Indonesia.</p>
-                    <div class="mt-3 space-y-2.5 text-xs">
+                    <div class="flex items-center gap-2.5">
+                        <span class="grid h-7 w-7 place-items-center rounded-lg bg-[#F0F9FF] font-mono text-xs font-extrabold text-[#0069A8]">A</span>
+                        <p class="text-xs font-extrabold tracking-wide text-[#0069A8] uppercase">Normalisasi Batch</p>
+                    </div>
+                    <p class="mt-2 text-xs leading-relaxed text-[#475569]">Merapikan spasi ganda, menyeragamkan label pilihan/checkbox, dan menstandarkan angka Indonesia.</p>
+                    <div class="mt-3.5 space-y-2.5 text-xs">
                         <label class="flex cursor-pointer items-center gap-2 text-slate-800">
                             <input type="checkbox" name="normalize_numbers" value="1" checked class="h-4 w-4 accent-[#0069A8]" />
                             <span>Bersihkan format angka (Rp / titik ribuan / koma)</span>
                         </label>
                         <label class="block">
                             <span class="mb-1 block font-semibold text-slate-700">Kapitalisasi kolom teks</span>
-                            <select name="text_case" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F6F9FC] px-2.5 text-xs text-slate-800">
+                            <select name="text_case" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F8FAFC] px-2.5 text-xs text-slate-800">
                                 <option value="none">Pertahankan huruf asli (rapikan spasi saja)</option>
                                 <option value="title">Title Case (Contoh: Nama Kompetisi)</option>
                                 <option value="upper">HURUF KAPITAL SEMUA</option>
@@ -178,46 +243,66 @@
                             </select>
                         </label>
                     </div>
-                    <button type="submit" class="mt-4 inline-flex min-h-[40px] w-full items-center justify-center rounded-xl border border-[#0069A8] bg-[#F0F9FF] px-3 py-2 text-xs font-bold text-[#0069A8] transition hover:bg-[#0069A8] hover:text-white">
-                        Jalankan Normalisasi Batch
+                    <button type="submit" class="mt-auto pt-4">
+                        <span class="inline-flex min-h-[40px] w-full items-center justify-center rounded-xl border border-[#0069A8] bg-[#F0F9FF] px-3 py-2 text-xs font-bold text-[#0069A8] transition hover:bg-[#0069A8] hover:text-white">
+                            Jalankan Normalisasi Batch
+                        </span>
                     </button>
                 </form>
 
                 <!-- 2. Deduplikasi -->
-                <form method="POST" action="{{ route('panel.preprocessing.deduplicate', $activeForm->code) }}" class="flex flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                <form method="POST" action="{{ route('panel.preprocessing.deduplicate', $activeForm->code) }}" class="wd-bento flex flex-col p-5">
                     @csrf
-                    <p class="text-xs font-bold tracking-wide text-[#0069A8] uppercase">Langkah B · Deduplikasi</p>
-                    <p class="mt-1 text-xs text-[#475569]">Mendeteksi entri ganda (terdeteksi saat ini: <strong class="text-slate-900">{{ $profile['duplicate_rows'] }}</strong> baris). Baris terbaru dipertahankan.</p>
-                    <div class="mt-3 space-y-2.5 text-xs">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <span class="grid h-7 w-7 place-items-center rounded-lg bg-[#F0F9FF] font-mono text-xs font-extrabold text-[#0069A8]">B</span>
+                            <p class="text-xs font-extrabold tracking-wide text-[#0069A8] uppercase">Deduplikasi</p>
+                        </div>
+                        @if($profile['duplicate_rows'] > 0)
+                            <span class="rounded-full bg-[#FFFBEB] px-2 py-0.5 font-mono text-[11px] font-bold text-[#92400E] ring-1 ring-amber-200">{{ $profile['duplicate_rows'] }} ganda</span>
+                        @endif
+                    </div>
+                    <p class="mt-2 text-xs leading-relaxed text-[#475569]">Mendeteksi entri ganda (terdeteksi saat ini: <strong class="text-slate-900">{{ $profile['duplicate_rows'] }}</strong> baris). Baris terbaru dipertahankan.</p>
+                    <div class="mt-3.5 space-y-2.5 text-xs">
                         <label class="block">
                             <span class="mb-1 block font-semibold text-slate-700">Kriteria kesamaan</span>
-                            <select name="scope" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F6F9FC] px-2.5 text-xs text-slate-800">
+                            <select name="scope" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F8FAFC] px-2.5 text-xs text-slate-800">
                                 <option value="same_values">Isi seluruh kolom identik</option>
                                 <option value="same_user_and_values">Pengirim &amp; isi sama persis</option>
                             </select>
                         </label>
                         <label class="block">
                             <span class="mb-1 block font-semibold text-slate-700">Tindakan untuk duplikat</span>
-                            <select name="action" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F6F9FC] px-2.5 text-xs text-slate-800">
+                            <select name="action" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F8FAFC] px-2.5 text-xs text-slate-800">
                                 <option value="reject">Tandai ditolak (pertahankan log audit)</option>
                                 <option value="delete">Hapus permanen dari respons</option>
                             </select>
                         </label>
                     </div>
-                    <button type="submit" class="mt-4 inline-flex min-h-[40px] w-full items-center justify-center rounded-xl border border-[#0069A8] bg-[#F0F9FF] px-3 py-2 text-xs font-bold text-[#0069A8] transition hover:bg-[#0069A8] hover:text-white">
-                        Tangani Baris Duplikat
+                    <button type="submit" class="mt-auto pt-4">
+                        <span class="inline-flex min-h-[40px] w-full items-center justify-center rounded-xl border border-[#0069A8] bg-[#F0F9FF] px-3 py-2 text-xs font-bold text-[#0069A8] transition hover:bg-[#0069A8] hover:text-white">
+                            Tangani Baris Duplikat
+                        </span>
                     </button>
                 </form>
 
                 <!-- 3. Penanganan Missing Values -->
-                <form method="POST" action="{{ route('panel.preprocessing.impute', $activeForm->code) }}" x-data="{ strat: 'mode' }" class="flex flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                <form id="langkah-c"
+                      method="POST"
+                      action="{{ route('panel.preprocessing.impute', $activeForm->code) }}"
+                      x-data="{ strat: 'mode' }"
+                      :class="imputePulse ? 'ring-2 ring-[#00A6F4] border-[#0069A8]' : ''"
+                      class="wd-bento flex flex-col p-5 transition-all">
                     @csrf
-                    <p class="text-xs font-bold tracking-wide text-[#0069A8] uppercase">Langkah C · Missing Value</p>
-                    <p class="mt-1 text-xs text-[#475569]">Imputasi nilai kosong per kolom (mean, median, modus, nilai tetap) atau tandai ditolak.</p>
-                    <div class="mt-3 space-y-2 text-xs">
+                    <div class="flex items-center gap-2.5">
+                        <span class="grid h-7 w-7 place-items-center rounded-lg bg-[#F0F9FF] font-mono text-xs font-extrabold text-[#0069A8]">C</span>
+                        <p class="text-xs font-extrabold tracking-wide text-[#0069A8] uppercase">Missing Value</p>
+                    </div>
+                    <p class="mt-2 text-xs leading-relaxed text-[#475569]">Imputasi nilai kosong per kolom (mean, median, modus, nilai tetap) atau tandai ditolak.</p>
+                    <div class="mt-3.5 space-y-2 text-xs">
                         <label class="block">
                             <span class="mb-1 block font-semibold text-slate-700">Kolom target</span>
-                            <select name="field_code" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F6F9FC] px-2.5 text-xs text-slate-800">
+                            <select name="field_code" x-model="imputeFieldCode" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F8FAFC] px-2.5 text-xs text-slate-800">
                                 @foreach($activeForm->fields ?? [] as $fl)
                                     <option value="{{ $fl['id'] }}">{{ $fl['label'] }} ({{ $fl['type'] }})</option>
                                 @endforeach
@@ -225,7 +310,7 @@
                         </label>
                         <label class="block">
                             <span class="mb-1 block font-semibold text-slate-700">Strategi</span>
-                            <select name="strategy" x-model="strat" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F6F9FC] px-2.5 text-xs text-slate-800">
+                            <select name="strategy" x-model="strat" class="h-9 w-full rounded-lg border border-slate-200 bg-[#F8FAFC] px-2.5 text-xs text-slate-800">
                                 <option value="mode">Isi dengan Modus (nilai terbanyak)</option>
                                 <option value="mean">Isi dengan Rata-rata (Mean angka)</option>
                                 <option value="median">Isi dengan Median (angka)</option>
@@ -235,8 +320,10 @@
                         </label>
                         <input x-show="strat === 'constant'" type="text" name="custom_value" placeholder="Masukkan nilai tetap..." class="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-900" />
                     </div>
-                    <button type="submit" class="mt-4 inline-flex min-h-[40px] w-full items-center justify-center rounded-xl border border-[#0069A8] bg-[#F0F9FF] px-3 py-2 text-xs font-bold text-[#0069A8] transition hover:bg-[#0069A8] hover:text-white">
-                        Terapkan Strategi
+                    <button type="submit" class="mt-auto pt-4">
+                        <span class="inline-flex min-h-[40px] w-full items-center justify-center rounded-xl border border-[#0069A8] bg-[#F0F9FF] px-3 py-2 text-xs font-bold text-[#0069A8] transition hover:bg-[#0069A8] hover:text-white">
+                            Terapkan Strategi
+                        </span>
                     </button>
                 </form>
             </section>
@@ -251,8 +338,8 @@
                 'valid' => ['Valid', $profile['valid']],
                 'ditolak' => ['Ditolak', $profile['ditolak']],
             ] as $sKey => [$sLabel, $sCount])
-                <a href="{{ route('panel.preprocessing', array_filter(['kategori' => $kategori, 'tahun' => $tahun, 'form' => $activeForm->code, 'q' => $q, 'status' => $sKey])) }}"
-                   class="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition {{ $status === $sKey ? 'border-[#0069A8] bg-[#0069A8] text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50' }}">
+                <a href="{{ route('panel.preprocessing.show', array_filter(['dataForm' => $activeForm->code, 'q' => $q !== '' ? $q : null, 'status' => $sKey !== 'all' ? $sKey : null])) }}"
+                   class="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition {{ $status === $sKey ? 'border-[#0069A8] bg-[#0069A8] text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-[#0069A8]/50 hover:bg-slate-50' }}">
                     <span>{{ $sLabel }}</span>
                     <span class="font-mono opacity-85">{{ $sCount }}</span>
                 </a>
@@ -261,16 +348,16 @@
 
         @if($submissionsPaginator->total() > 0)
             @php $cols = $activeForm->sourceCols(); @endphp
-            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-surface">
+            <div class="wd-bento overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-surface-strong">
+                    <table class="wd-hairline-table">
+                        <thead>
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">Baris &amp; Status</th>
+                                <th class="sticky left-0 z-10 bg-[#F8FAFC] px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase shadow-[1px_0_0_rgba(15,23,42,0.06)]">Baris &amp; Status</th>
                                 @foreach($cols as $col)
-                                    <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">{{ $col['label'] }}</th>
+                                    <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">{{ $col['label'] }}</th>
                                 @endforeach
-                                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">Kualitas &amp; Aksi</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Kualitas &amp; Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -279,17 +366,16 @@
                                     $issues = $qualityIssues[$sub->id] ?? [];
                                     $rawMap = $sub->rawValues ?? [];
                                     $fieldValues = $sub->values ?? [];
-                                    $cleanPayload = [
-                                        'code' => $sub->code,
-                                        'action' => route('panel.data.submissions.update', $sub->code),
-                                        'formTitle' => $activeForm->title,
-                                        'fields' => $activeForm->fields ?? [],
-                                        'values' => $fieldValues,
-                                        'rawValues' => $rawMap,
-                                    ];
+                                    $subAttachments = $sub->attachments ?? [];
+                                    $rowBg = $sub->status_validasi === 'ditolak'
+                                        ? 'bg-slate-50/90 opacity-80'
+                                        : (! empty($issues) ? 'bg-[#FEF2F2]' : 'bg-white hover:bg-[#F8FAFC]');
+                                    $stickyBg = $sub->status_validasi === 'ditolak'
+                                        ? 'bg-slate-50'
+                                        : (! empty($issues) ? 'bg-[#FEF2F2]' : 'bg-white');
                                 @endphp
-                                <tr class="border-t border-slate-100 {{ $sub->status_validasi === 'ditolak' ? 'bg-slate-50/80 opacity-80' : (! empty($issues) ? 'bg-[#FEF2F2]' : 'hover:bg-white') }}">
-                                    <td class="px-4 py-3 align-top text-xs whitespace-nowrap">
+                                <tr class="{{ $rowBg }}">
+                                    <td class="sticky left-0 z-10 px-4 py-3 align-top text-xs whitespace-nowrap shadow-[1px_0_0_rgba(15,23,42,0.06)] {{ $stickyBg }}">
                                         <p class="font-mono font-bold text-slate-900">{{ $sub->code }}</p>
                                         <span class="mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold {{ $sub->sumber_input === 'impor' ? 'bg-slate-100 text-slate-700' : 'bg-[#F0F9FF] text-[#0069A8]' }}">
                                             {{ $sub->sumber_input === 'impor' ? 'Impor' : 'GForm' }}
@@ -306,11 +392,36 @@
                                             $fid = $fl['id'];
                                             $val = (string) ($fieldValues[$fid] ?? '');
                                             $rawVal = (string) ($rawMap[$fid] ?? $val);
+                                            $isFileCol = ($fl['type'] ?? '') === 'file';
+                                            $attPath = $isFileCol ? ($subAttachments[$fid] ?? null) : null;
+                                            $attExists = is_string($attPath) && $attPath !== '' && \Illuminate\Support\Facades\Storage::disk('local')->exists($attPath);
+                                            $attSize = $attExists ? (int) \Illuminate\Support\Facades\Storage::disk('local')->size($attPath) : 0;
                                         @endphp
-                                        <td class="max-w-[220px] px-4 py-3 align-top text-sm text-slate-800" title="{{ $val }}">
-                                            <p class="truncate">{{ $val !== '' ? $val : '-' }}</p>
-                                            @if($rawVal !== $val)
-                                                <p class="truncate text-[11px] text-[#475569]">Mentah: {{ $rawVal !== '' ? $rawVal : '(kosong)' }}</p>
+                                        <td class="max-w-[240px] px-4 py-3 align-top text-sm text-slate-800" title="{{ $val }}">
+                                            @if($isFileCol)
+                                                @if($attExists && $attSize > 0)
+                                                    <div class="space-y-1.5">
+                                                        <p class="truncate font-medium text-[#0069A8]">{{ $val !== '' ? $val : basename($attPath) }}</p>
+                                                        <div class="flex flex-wrap items-center gap-1.5">
+                                                            <a href="{{ route('panel.submissions.file', [$sub->code, $fid, 'inline' => 1]) }}" target="_blank" rel="noopener" class="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">Lihat</a>
+                                                            <a href="{{ route('panel.submissions.file', [$sub->code, $fid]) }}" class="rounded-md border border-[#BAE6FD] bg-[#F0F9FF] px-2 py-0.5 text-[11px] font-bold text-[#0069A8] hover:bg-sky-100">Unduh</a>
+                                                        </div>
+                                                    </div>
+                                                @else
+                                                    <div class="space-y-1">
+                                                        <span class="inline-flex rounded bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-[#B91C1C]">
+                                                            {{ ($attExists && $attSize === 0) ? 'Berkas kosong (0 B)' : 'Belum ada bukti' }}
+                                                        </span>
+                                                        <div>
+                                                            <a href="{{ route('panel.preprocessing.submissions.edit', $sub->code) }}" class="text-[11px] font-bold text-[#0069A8] hover:underline">Unggah bukti →</a>
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <p class="truncate">{{ $val !== '' ? $val : '-' }}</p>
+                                                @if($rawVal !== $val)
+                                                    <p class="truncate text-[11px] text-[#475569]">Mentah: {{ $rawVal !== '' ? $rawVal : '(kosong)' }}</p>
+                                                @endif
                                             @endif
                                         </td>
                                     @endforeach
@@ -331,15 +442,14 @@
                                             @endif
                                         </div>
                                         <div class="flex flex-wrap gap-1.5">
-                                            <button
-                                                type="button"
-                                                @click="openClean(@js($cleanPayload))"
+                                            <a
+                                                href="{{ route('panel.preprocessing.submissions.edit', $sub->code) }}"
                                                 class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-[#0069A8] hover:text-[#0069A8]"
-                                                title="Perbaiki sel"
+                                                title="Perbaiki data isian di halaman khusus"
                                                 aria-label="Perbaiki isian"
                                             >
-                                                <i data-lucide="pencil" class="h-4 w-4"></i>
-                                            </button>
+                                                <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>
+                                            </a>
                                             <form method="POST" action="{{ route('panel.preprocessing.submissions.status', $sub->code) }}" class="inline">
                                                 @csrf
                                                 @method('PATCH')
@@ -362,7 +472,7 @@
                                                 class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-[#B91C1C]"
                                                 aria-label="Hapus isian"
                                             >
-                                                <i data-lucide="trash-2" class="h-4 w-4"></i>
+                                                <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                     </td>
@@ -374,8 +484,8 @@
                 {{ $submissionsPaginator->links('components.pagination') }}
             </div>
         @else
-            <div class="rounded-2xl border border-dashed border-slate-300 bg-surface px-6 py-14 text-center">
-                <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-500">
+            <div class="wd-bento border-dashed border-slate-300 px-6 py-14 text-center">
+                <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F0F9FF] text-[#0069A8]">
                     <i data-lucide="sparkles" class="h-6 w-6" aria-hidden="true"></i>
                 </span>
                 <p class="mt-4 font-bold text-slate-800">
@@ -386,11 +496,13 @@
         @endif
 
         @if(! empty($preprocessingLogs))
-            <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
-                <h3 class="text-sm font-bold text-slate-900">Jejak Audit Pre-processing</h3>
-                <ul class="mt-3 divide-y divide-slate-100 text-xs">
+            <section class="wd-bento mt-6 p-5">
+                <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Audit Log</p>
+                <h3 class="mt-0.5 text-sm font-extrabold text-slate-900">Jejak Audit Pre-processing</h3>
+                <ol class="mt-4 space-y-3 border-l-2 border-slate-200 pl-4 text-xs">
                     @foreach(array_slice($preprocessingLogs, 0, 8) as $log)
-                        <li class="flex flex-wrap items-center justify-between gap-2 py-2">
+                        <li class="relative flex flex-wrap items-center justify-between gap-2">
+                            <span class="absolute -left-[21px] h-2.5 w-2.5 rounded-full bg-[#0069A8] ring-4 ring-white" aria-hidden="true"></span>
                             <span>
                                 <strong class="font-bold text-[#0069A8]">{{ $log['action'] ?? 'Aksi' }}:</strong>
                                 <span class="text-slate-700">{{ $log['detail'] ?? '' }}</span>
@@ -398,12 +510,12 @@
                             <span class="font-mono text-[#475569]">{{ $log['at_label'] ?? '' }}</span>
                         </li>
                     @endforeach
-                </ul>
+                </ol>
             </section>
         @endif
     @else
-        <div class="rounded-2xl border border-dashed border-slate-300 bg-surface px-6 py-14 text-center">
-            <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-500">
+        <div class="wd-bento border-dashed border-slate-300 px-6 py-14 text-center">
+            <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F0F9FF] text-[#0069A8]">
                 <i data-lucide="database" class="h-6 w-6" aria-hidden="true"></i>
             </span>
             <p class="mt-4 font-bold text-slate-800">Belum ada formulir pada filter ini</p>
@@ -414,99 +526,18 @@
         </div>
     @endif
 
-    <!-- Clean Submission Modal -->
-    <template x-if="cleanOpen && cleanTarget">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="cleanOpen = false" @keydown.escape.window="cleanOpen = false">
-            <div role="dialog" aria-modal="true" aria-labelledby="clean-modal-title" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
-                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
-                    <div class="min-w-0">
-                        <h2 id="clean-modal-title" class="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">Perbaiki data isian (<span x-text="cleanTarget.code"></span>)</h2>
-                        <p class="mt-1 text-sm text-[#475569]" x-text="cleanTarget.formTitle"></p>
-                    </div>
-                    <button type="button" @click="cleanOpen = false" aria-label="Tutup" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                </div>
-
-                <form :action="cleanTarget.action" method="POST" @submit="submitClean($event)" novalidate class="flex min-h-0 flex-col">
-                    @csrf
-                    <input type="hidden" name="_method" value="PUT">
-
-                    <div class="space-y-4 overflow-y-auto px-5 py-6 sm:px-8">
-                        <div class="flex gap-3 rounded-xl bg-[#F0F9FF] px-4 py-3 text-xs font-medium text-[#0069A8]">
-                            Perbaikan hanya mengubah nilai bersih (`nilai`), sedangkan jejak nilai asli sebelum dibersihkan tetap tersimpan di `nilai_mentah`.
-                        </div>
-
-                        <button type="button" @click="normalizeCleanValues()" class="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                            Seragamkan spasi, angka &amp; pilihan
-                        </button>
-
-                        <template x-for="f in cleanTarget.fields" :key="f.id">
-                            <div class="block">
-                                <span class="mb-1.5 block text-sm font-semibold text-slate-800">
-                                    <span x-text="f.label"></span>
-                                    <template x-if="f.required">
-                                        <span class="ml-0.5 text-[#B91C1C]">*</span>
-                                    </template>
-                                </span>
-
-                                <template x-if="f.type === 'select' || f.type === 'radio'">
-                                    <select :name="`values[${f.id}]`" x-model="cleanValues[f.id]" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0069A8] focus:ring-4 focus:ring-sky-100">
-                                        <option value="">Pilih...</option>
-                                        <template x-if="cleanValues[f.id] && !(f.options || []).includes(cleanValues[f.id])">
-                                            <option :value="cleanValues[f.id]" x-text="`${cleanValues[f.id]} (tidak valid)`"></option>
-                                        </template>
-                                        <template x-for="o in f.options || []" :key="o">
-                                            <option :value="o" x-text="o"></option>
-                                        </template>
-                                    </select>
-                                </template>
-
-                                <template x-if="f.type === 'checkbox'">
-                                    <div class="space-y-1">
-                                        <input type="text" :name="`values[${f.id}]`" x-model="cleanValues[f.id]" placeholder="Pisahkan opsi dengan koma" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0069A8]" />
-                                        <p class="text-[11px] text-[#475569]" x-text="'Opsi valid: ' + (f.options || []).join(', ')"></p>
-                                    </div>
-                                </template>
-
-                                <template x-if="f.type === 'textarea'">
-                                    <textarea rows="3" :name="`values[${f.id}]`" x-model="cleanValues[f.id]" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0069A8] focus:ring-4 focus:ring-sky-100"></textarea>
-                                </template>
-
-                                <template x-if="!['select', 'radio', 'checkbox', 'textarea'].includes(f.type)">
-                                    <input :type="f.type === 'file' ? 'text' : f.type" :name="`values[${f.id}]`" x-model="cleanValues[f.id]" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0069A8] focus:ring-4 focus:ring-sky-100" />
-                                </template>
-
-                                <span x-show="cleanErrors[f.id]" class="mt-1 block text-xs font-semibold text-[#B91C1C]" x-text="cleanErrors[f.id]"></span>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-8">
-                        <button type="button" @click="cleanOpen = false" class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            Batal
-                        </button>
-                        <button type="submit" class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#0069A8] px-5 py-2 text-sm font-semibold text-white hover:bg-[#182654]">
-                            Simpan perbaikan
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </template>
-
     <!-- Import Spreadsheet Responses Modal -->
     @if($activeForm)
-        <template x-if="importOpen">
-            <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="importOpen = false" @keydown.escape.window="importOpen = false">
+        <template x-teleport="body">
+            <div x-show="importOpen" x-cloak class="fixed inset-0 z-[65] grid place-items-end bg-slate-950/55 backdrop-blur-xs sm:place-items-center sm:p-6" @click.self="importOpen = false" @keydown.escape.window="importOpen = false">
                 <div role="dialog" aria-modal="true" aria-labelledby="import-modal-title" class="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
-                    <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-7 sm:pt-6">
+                    <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-7 sm:pt-6">
                         <div class="min-w-0">
                             <h2 id="import-modal-title" class="text-xl font-extrabold tracking-tight text-slate-900">Impor Respons GForm (Excel / CSV)</h2>
                             <p class="mt-1 text-sm text-[#475569]">{{ $activeForm->title }}</p>
                         </div>
                         <button type="button" @click="importOpen = false" aria-label="Tutup" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
 
@@ -553,72 +584,30 @@
 @push('scripts')
 @include('panel.partials.dataset-builder-script')
 <script>
-function collectedDataManager() {
+function collectedDataManager(defaultFieldCode) {
     return {
         ...datasetBuilderMixin(@json($builderFormsPayload)),
         importOpen: false,
-        cleanOpen: false,
-        cleanTarget: null,
-        cleanValues: {},
-        cleanErrors: {},
+        profilingExpanded: true,
+        imputeFieldCode: defaultFieldCode || '',
+        imputePulse: false,
 
         init() {
-            const reopenCode = @json(session('clean_submission_code'));
-            if (reopenCode) {
-                const errs = @json($errors->toArray());
-                Object.keys(errs).forEach((k) => {
-                    this.cleanErrors[k] = errs[k][0];
-                });
-            }
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     this.importOpen = false;
-                    this.cleanOpen = false;
                     this.builderOpen = false;
                 }
             });
         },
 
-        openClean(payload) {
-            this.cleanTarget = payload;
-            this.cleanValues = { ...(payload.values || {}) };
-            this.cleanErrors = {};
-            this.cleanOpen = true;
-        },
-
-        normalizeCleanValues() {
-            if (!this.cleanTarget || !window.SatuDataQuality) return;
-            const updated = {};
-            this.cleanTarget.fields.forEach((f) => {
-                updated[f.id] = window.SatuDataQuality.normalizeValue(f, this.cleanValues[f.id] ?? '', { normalizeNumbers: true });
-            });
-            this.cleanValues = updated;
-        },
-
-        submitClean(ev) {
-            if (!this.cleanTarget) return;
-            this.cleanErrors = {};
-            this.cleanTarget.fields.forEach((f) => {
-                const val = String(this.cleanValues[f.id] ?? '').trim();
-                if (!val && f.required) {
-                    this.cleanErrors[f.id] = 'Data wajib masih kosong.';
-                } else if (val && f.type === 'number' && !Number.isFinite(Number(val))) {
-                    this.cleanErrors[f.id] = 'Nilai harus berupa angka yang valid.';
-                } else if (val && (f.type === 'select' || f.type === 'radio') && !(f.options || []).includes(val)) {
-                    this.cleanErrors[f.id] = 'Nilai tidak sesuai pilihan formulir.';
-                } else if (val && f.type === 'checkbox') {
-                    const opts = f.options || [];
-                    const parts = val.split(',').map((x) => x.trim()).filter(Boolean);
-                    if (parts.some((p) => !opts.includes(p))) {
-                        this.cleanErrors[f.id] = 'Terdapat pilihan kotak centang yang tidak sesuai.';
-                    }
-                } else if (val && f.type === 'file' && !/\.(pdf|jpe?g|png)$/i.test(val)) {
-                    this.cleanErrors[f.id] = 'Format bukti harus PDF, JPG, atau PNG.';
-                }
-            });
-            if (Object.keys(this.cleanErrors).length > 0) {
-                ev.preventDefault();
-            }
+        targetMissingField(fieldCode) {
+            this.imputeFieldCode = fieldCode;
+            this.imputePulse = true;
+            document.getElementById('langkah-c')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                this.imputePulse = false;
+            }, 1800);
         },
     };
 }

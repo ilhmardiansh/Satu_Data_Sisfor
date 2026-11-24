@@ -129,7 +129,7 @@ class ManageDatasetController extends Controller
         $formFields = collect($form->fields ?? []);
         if ($validated['mode'] === 'rekap' && $aggFunc !== 'count') {
             $numericTarget = $formFields->firstWhere('id', $aggFieldId);
-            if (! $numericTarget || ($numericTarget['type'] ?? '') !== 'number') {
+            if (! $numericTarget || ! in_array($numericTarget['type'] ?? '', ['number', 'linear_scale', 'rating'], true)) {
                 return back()->withInput()->with('error', 'Pilih kolom bertipe angka untuk fungsi agregasi total, rata-rata, minimum, atau maksimum.');
             }
         }

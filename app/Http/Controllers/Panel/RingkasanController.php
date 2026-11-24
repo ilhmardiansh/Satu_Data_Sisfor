@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\DataForm;
 use App\Models\DataRequest;
 use App\Models\Dataset;
@@ -59,6 +60,7 @@ class RingkasanController extends Controller
         $submissionsCount = FormSubmission::query()->count();
         $rawSubmissionsCount = FormSubmission::query()->where('status_validasi', 'mentah')->count();
         $validSubmissionsCount = FormSubmission::query()->where('status_validasi', 'valid')->count();
+        $rejectedSubmissionsCount = FormSubmission::query()->where('status_validasi', 'ditolak')->count();
         $formsNeedPreprocessingCount = DataForm::query()->where('status_preprocessing', 'proses')->count();
         $formsReadyCount = DataForm::query()->where('status_preprocessing', 'siap')->count();
         $publicDatasetsCount = Dataset::published()->where('tipe_akses', 'public')->count();
@@ -66,12 +68,44 @@ class RingkasanController extends Controller
         $draftDatasetsCount = Dataset::query()->where('status_publikasi', 'draft')->count();
         $totalDatasetsCount = Dataset::query()->count();
         $visualizationsCount = Visualization::datasetCharts()->count();
+        $activeVisualizationsCount = Visualization::datasetCharts()
+            ->get()
+            ->filter(fn (Visualization $viz): bool => $viz->show)
+            ->count();
+        $categoriesCount = Category::query()->count();
         $pendingRequestsCount = DataRequest::query()->where('status', 'menunggu')->count();
+
+        $activeSubmissionsTotal = max(0, $submissionsCount - $rejectedSubmissionsCount);
+        $qualityHealthScore = $activeSubmissionsTotal > 0
+            ? (int) round(($validSubmissionsCount / $activeSubmissionsTotal) * 100)
+            : null;
+
+        $activeFormsList = DataForm::query()
+            ->with('category')
+            ->withCount([
+                'submissions',
+                'submissions as valid_submissions_count' => fn ($q) => $q->where('status_validasi', 'valid'),
+                'submissions as raw_submissions_count' => fn ($q) => $q->where('status_validasi', 'mentah'),
+            ])
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get();
+
+        $categoryDistribution = Category::query()
+            ->withCount(['dataForms', 'datasets'])
+            ->get()
+            ->sort(function (Category $a, Category $b): int {
+                $totalDiff = ($b->data_forms_count + $b->datasets_count) <=> ($a->data_forms_count + $a->datasets_count);
+
+                return $totalDiff !== 0 ? $totalDiff : $a->id <=> $b->id;
+            })
+            ->take(6)
+            ->values();
 
         $recentSubmissions = FormSubmission::query()
             ->with(['dataForm', 'user'])
             ->orderByDesc('waktu_pengisian')
-            ->limit(5)
+            ->limit(8)
             ->get();
 
         $pendingRequests = DataRequest::query()
@@ -87,6 +121,7 @@ class RingkasanController extends Controller
             'submissionsCount',
             'rawSubmissionsCount',
             'validSubmissionsCount',
+            'rejectedSubmissionsCount',
             'formsNeedPreprocessingCount',
             'formsReadyCount',
             'publicDatasetsCount',
@@ -94,7 +129,12 @@ class RingkasanController extends Controller
             'draftDatasetsCount',
             'totalDatasetsCount',
             'visualizationsCount',
+            'activeVisualizationsCount',
+            'categoriesCount',
             'pendingRequestsCount',
+            'qualityHealthScore',
+            'activeFormsList',
+            'categoryDistribution',
             'recentSubmissions',
             'pendingRequests'
         ));

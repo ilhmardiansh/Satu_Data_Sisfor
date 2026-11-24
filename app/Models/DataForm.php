@@ -23,6 +23,7 @@ class DataForm extends Model
         'periode',
         'target',
         'batasi_satu_respon',
+        'pengaturan',
         'status_preprocessing',
         'ringkasan_preprocessing',
         'diproses_oleh',
@@ -40,9 +41,63 @@ class DataForm extends Model
             'tanggal_waktu' => 'datetime',
             'status_aktif' => 'boolean',
             'batasi_satu_respon' => 'boolean',
+            'pengaturan' => 'array',
             'ringkasan_preprocessing' => 'array',
             'waktu_diproses' => 'datetime',
         ];
+    }
+
+    /**
+     * Default Google Forms Studio settings harmonized to UNUSA visual identity.
+     *
+     * @return array<string, mixed>
+     */
+    public static function defaultSettings(): array
+    {
+        return [
+            'theme' => [
+                'palette' => 'cerulean',
+                'bg_tone' => 'soft',
+                'header_preset' => 'cerulean-grid',
+                'header_image' => '',
+                'font_family' => 'jakarta',
+                'header_size' => 24,
+                'question_size' => 15,
+                'text_size' => 13,
+            ],
+            'is_quiz' => false,
+            'release_grade' => 'immediately',
+            'quiz_show_missed' => true,
+            'quiz_show_correct' => true,
+            'quiz_show_points' => true,
+            'default_points' => 10,
+            'collect_identity' => true,
+            'allow_edit_after_submit' => false,
+            'closed_message' => 'Formulir ini sudah tidak menerima respons baru.',
+            'show_progress_bar' => true,
+            'shuffle_questions' => false,
+            'confirmation_message' => 'Respons Anda telah direkam dan masuk ke antrean Pre-processing Wali Data.',
+            'show_another_response_link' => true,
+            'show_summary_after_submit' => false,
+            'default_required' => false,
+        ];
+    }
+
+    protected function settings(): Attribute
+    {
+        return Attribute::make(
+            get: function (): array {
+                $defaults = self::defaultSettings();
+                $stored = is_array($this->pengaturan) ? $this->pengaturan : [];
+                $merged = array_merge($defaults, $stored);
+                $merged['theme'] = array_merge(
+                    $defaults['theme'],
+                    is_array($stored['theme'] ?? null) ? $stored['theme'] : []
+                );
+
+                return $merged;
+            },
+        );
     }
 
     protected function categoryId(): Attribute
@@ -80,7 +135,28 @@ class DataForm extends Model
         );
     }
 
+    /**
+     * Answerable input fields only (excludes section dividers and content/media blocks).
+     */
     protected function fields(): Attribute
+    {
+        return Attribute::make(
+            get: function (): array {
+                $this->loadMissing('kolomFormulir');
+
+                return $this->kolomFormulir
+                    ->filter(fn (FormField $col): bool => $col->isInputField())
+                    ->map(fn (FormField $col): array => $col->toFieldArray())
+                    ->values()
+                    ->all();
+            },
+        );
+    }
+
+    /**
+     * All ordered form items (both input questions and layout/media/section blocks).
+     */
+    protected function items(): Attribute
     {
         return Attribute::make(
             get: function (): array {
@@ -150,24 +226,46 @@ class DataForm extends Model
     {
         $existing = $this->kolomFormulir()->get()->keyBy('kode_kolom');
         $keptCodes = [];
+        $usedCodes = [];
 
         foreach (array_values($fields) as $index => $item) {
-            $code = trim((string) ($item['id'] ?? '')) ?: 'q'.($index + 1);
+            $rawCode = trim((string) ($item['id'] ?? '')) ?: 'q'.($index + 1);
+            $code = $rawCode;
+            $suffix = 2;
+            while (isset($usedCodes[$code])) {
+                $code = $rawCode.'_'.$suffix;
+                $suffix++;
+            }
+            $usedCodes[$code] = true;
+
             $type = (string) ($item['type'] ?? 'text');
+            if (! in_array($type, FormField::ALL_TYPES, true)) {
+                $type = 'text';
+            }
+
+            $isInput = ! in_array($type, FormField::NON_INPUT_TYPES, true);
             $hasOptions = in_array($type, ['select', 'radio', 'checkbox'], true);
             $options = $hasOptions
                 ? array_values(array_filter(array_map('trim', array_map('strval', $item['options'] ?? []))))
                 : null;
             $helpText = trim((string) ($item['help'] ?? ''));
 
+            $config = is_array($item['config'] ?? null) ? $item['config'] : [];
+            if (mb_strlen($helpText) > 255) {
+                $config['full_help'] = $helpText;
+            } else {
+                unset($config['full_help']);
+            }
+
             $payload = [
                 'id_formulir' => $this->id,
                 'kode_kolom' => $code,
                 'label' => trim((string) ($item['label'] ?? $code)),
-                'deskripsi_bantuan' => $helpText !== '' ? $helpText : null,
+                'deskripsi_bantuan' => $helpText !== '' ? mb_substr($helpText, 0, 255) : null,
                 'tipe_kolom' => $type,
-                'wajib_diisi' => (bool) ($item['required'] ?? false),
+                'wajib_diisi' => $isInput ? (bool) ($item['required'] ?? false) : false,
                 'opsi' => $options ?: null,
+                'konfigurasi' => ! empty($config) ? $config : null,
                 'urutan' => $index + 1,
             ];
 

@@ -38,6 +38,7 @@ Route::post('/dataset/{dataset:code}/request', [DatasetController::class, 'store
 Route::get('/berita', [BeritaController::class, 'index'])->name('berita');
 Route::get('/berita/{code}', [BeritaController::class, 'show'])->name('berita.show');
 Route::get('/pengisian-data', [PengisianDataController::class, 'index'])->name('pengisian-data');
+Route::get('/formulir-media/{path}', [DataFormController::class, 'serveMedia'])->where('path', '.*')->name('formulir.media');
 Route::get('/formulir/{dataForm:code}', [FormSubmissionController::class, 'showPublicForm'])->name('formulir.show');
 Route::get('/tentang-kami', [TentangController::class, 'index'])->name('tentang-kami');
 
@@ -60,13 +61,18 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
     // Pengisian Formulir: Produsen Data & Admin (Wali Data 403)
     Route::middleware('role:produsen,admin')->group(function (): void {
         Route::get('/isi', [FormSubmissionController::class, 'index'])->name('isi');
+        Route::post('/isi/{dataForm:code}/upload-chunk', [FormSubmissionController::class, 'uploadChunk'])->name('isi.upload-chunk');
         Route::post('/isi/{dataForm:code}', [FormSubmissionController::class, 'store'])->name('isi.submit');
     });
 
     // Staff: Wali Data & Admin
     Route::middleware('role:wali,admin')->group(function (): void {
         Route::get('/formulir', [DataFormController::class, 'index'])->name('formulir');
+        Route::get('/formulir/buat', [DataFormController::class, 'create'])->name('formulir.create');
+        Route::post('/formulir/media', [DataFormController::class, 'uploadMedia'])->name('formulir.media.upload');
         Route::post('/formulir', [DataFormController::class, 'store'])->name('formulir.store');
+        Route::get('/formulir/{dataForm:code}/ubah', [DataFormController::class, 'edit'])->name('formulir.edit');
+        Route::post('/formulir/{dataForm:code}/duplikat', [DataFormController::class, 'duplicate'])->name('formulir.duplicate');
         Route::put('/formulir/{dataForm:code}', [DataFormController::class, 'update'])->name('formulir.update');
         Route::patch('/formulir/{dataForm:code}/toggle', [DataFormController::class, 'toggleActive'])->name('formulir.toggle');
         Route::delete('/formulir/{dataForm:code}', [DataFormController::class, 'destroy'])
@@ -87,9 +93,12 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
         Route::post('/preprocessing/{dataForm:code}/impute', [CollectedDataController::class, 'imputeBatch'])->name('preprocessing.impute');
         Route::post('/preprocessing/{dataForm:code}/finalize', [CollectedDataController::class, 'finalizePreprocessing'])->name('preprocessing.finalize');
 
+        Route::get('/preprocessing/submissions/{submission:code}/perbaiki', [CollectedDataController::class, 'editSubmission'])->name('preprocessing.submissions.edit');
+        Route::post('/preprocessing/submissions/{submission:code}/upload-chunk', [CollectedDataController::class, 'uploadSubmissionChunk'])->name('preprocessing.submissions.upload-chunk');
         Route::put('/preprocessing/submissions/{submission:code}', [CollectedDataController::class, 'updateSubmission'])->name('data.submissions.update');
         Route::patch('/preprocessing/submissions/{submission:code}/status', [CollectedDataController::class, 'updateSubmissionStatus'])->name('preprocessing.submissions.status');
         Route::delete('/preprocessing/submissions/{submission:code}', [CollectedDataController::class, 'destroySubmission'])->name('data.submissions.destroy');
+        Route::get('/preprocessing/{dataForm:code}', [CollectedDataController::class, 'show'])->name('preprocessing.show');
 
         Route::get('/kategori', [CategoryController::class, 'index'])->name('kategori');
         Route::post('/kategori', [CategoryController::class, 'store'])->name('kategori.store');

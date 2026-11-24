@@ -15,37 +15,54 @@
 
 <div x-data="permohonanManager()">
     <x-panel-head
+        eyebrow="LAYANAN AKSES · DATASET PRIVATE"
+        scene="permohonan"
+        badge="{{ $counts['menunggu'] ?? 0 }} Menunggu"
+        :badgeTone="($counts['menunggu'] ?? 0) > 0 ? 'amber' : 'sky'"
         title="Permohonan Data"
         desc="Tinjau pengajuan akses dataset berstatus Private. Permohonan yang disetujui membuka unduhan untuk pemohon terkait."
     />
 
-    <div class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
-        @foreach($tabs as $t)
-            @php $active = $tab === $t['k']; @endphp
-            <a href="{{ route('panel.permohonan', ['tab' => $t['k']]) }}"
-               class="-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition {{ $active ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-800' }}">
-                <span>{{ $t['label'] }}</span>
-                <span class="rounded-full px-1.5 text-[11px] font-bold {{ $active ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-600' }}">
-                    {{ $t['count'] }}
-                </span>
-            </a>
-        @endforeach
+    <div class="wd-bento mb-6 flex flex-wrap items-center justify-between gap-3 p-3">
+        <div class="flex flex-wrap gap-1 rounded-xl border border-slate-200/90 bg-[#F8FAFC] p-1">
+            @foreach($tabs as $t)
+                @php $active = $tab === $t['k']; @endphp
+                <a href="{{ route('panel.permohonan', ['tab' => $t['k']]) }}"
+                   class="inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition {{ $active ? 'bg-[#0069A8] text-white' : 'text-slate-600 hover:text-slate-900' }}">
+                    <span>{{ $t['label'] }}</span>
+                    <span class="rounded-full px-1.5 font-mono text-[11px] font-bold {{ $active ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-700' }}">
+                        {{ $t['count'] }}
+                    </span>
+                </a>
+            @endforeach
+        </div>
+
+        <label class="flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 focus-within:border-[#0069A8] focus-within:bg-white sm:max-w-xs">
+            <i data-lucide="search" class="h-4 w-4 shrink-0 text-[#475569]" aria-hidden="true"></i>
+            <input type="text"
+                   x-model="quickSearch"
+                   placeholder="Cari pemohon, NIM, atau dataset..."
+                   class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+        </label>
     </div>
 
     @if($requests->isEmpty())
-        <div class="rounded-2xl border border-dashed border-slate-300 bg-surface px-6 py-12 text-center">
+        <div class="wd-bento border-dashed border-slate-300 px-6 py-12 text-center">
             <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F0F9FF] text-[#0069A8]">
-                <i data-lucide="inbox" class="h-6 w-6"></i>
+                <i data-lucide="inbox" class="h-6 w-6" aria-hidden="true"></i>
             </span>
             <p class="mt-4 text-base font-bold text-slate-900">Belum ada permohonan data</p>
-            <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">
+            <p class="mx-auto mt-1 max-w-md text-sm text-[#475569]">
                 Permohonan akses dataset berstatus Private dari pengguna publik akan muncul di sini.
             </p>
         </div>
     @else
         <div class="space-y-4">
             @foreach($requests as $r)
-                <article class="rounded-2xl border border-slate-200 bg-surface p-5">
+                @php
+                    $searchKey = strtolower($r->code.' '.$r->nama.' '.$r->nim.' '.($r->dataset?->title ?? ''));
+                @endphp
+                <article x-show="matchesSearch(@js($searchKey))" class="wd-bento-interactive p-5">
                     <div class="flex flex-wrap items-start justify-between gap-4">
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
@@ -56,23 +73,23 @@
                                 @if($r->dataset)
                                     <x-access-badge :access="$r->dataset->access" />
                                 @endif
-                                <span class="text-xs text-slate-500">
+                                <span class="font-mono text-xs text-[#475569]">
                                     {{ $r->requested_at?->format('d M Y, H:i') }}
                                 </span>
                             </div>
 
-                            <h2 class="mt-2.5 text-base font-bold text-slate-900">
+                            <h2 class="mt-2.5 text-base font-extrabold text-slate-900">
                                 {{ $r->dataset?->title ?? 'Dataset tidak tersedia' }}
                             </h2>
 
-                            <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
+                            <div class="mt-2.5 grid grid-cols-1 gap-2 rounded-xl border border-slate-200/70 bg-[#F8FAFC] px-3.5 py-2.5 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
                                 <span><strong class="font-semibold text-slate-800">Pemohon:</strong> {{ $r->nama }}</span>
-                                <span><strong class="font-semibold text-slate-800">NIM/NIP:</strong> {{ $r->nim }}</span>
-                                <span><strong class="font-semibold text-slate-800">Email:</strong> {{ $r->email }}</span>
-                                <span><strong class="font-semibold text-slate-800">HP:</strong> {{ $r->hp }}</span>
+                                <span><strong class="font-semibold text-slate-800">NIM/NIP:</strong> <span class="font-mono">{{ $r->nim }}</span></span>
+                                <span class="truncate"><strong class="font-semibold text-slate-800">Email:</strong> {{ $r->email }}</span>
+                                <span><strong class="font-semibold text-slate-800">HP:</strong> <span class="font-mono">{{ $r->hp }}</span></span>
                             </div>
 
-                            <div class="mt-3 rounded-xl border border-slate-200/80 bg-white px-4 py-3 text-sm">
+                            <div class="mt-3 rounded-xl border border-slate-200/80 border-l-4 border-l-[#0069A8] bg-white px-4 py-3 text-sm">
                                 <p class="text-slate-700">
                                     <span class="font-semibold text-slate-900">Tujuan:</span> {{ $r->tujuan }}
                                 </p>
@@ -82,15 +99,15 @@
                             </div>
 
                             @if($r->status !== 'menunggu')
-                                <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#475569]">
                                     @if($r->decider)
-                                        <span>Diputuskan oleh <strong class="text-slate-700">{{ $r->decider->name }}</strong></span>
+                                        <span>Diputuskan oleh <strong class="text-slate-800">{{ $r->decider->name }}</strong></span>
                                     @endif
                                     @if($r->decided_at)
                                         <span>· {{ $r->decided_at->format('d M Y, H:i') }}</span>
                                     @endif
                                     @if($r->note)
-                                        <span class="w-full text-slate-600">Catatan: “{{ $r->note }}”</span>
+                                        <span class="w-full text-slate-700">Catatan: “{{ $r->note }}”</span>
                                     @endif
                                 </div>
                             @endif
@@ -108,9 +125,9 @@
                                         action: @js(route('panel.permohonan.decide', $r->code)),
                                         note: ''
                                     })"
-                                    class="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl bg-[#047857] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[#065F46]"
+                                    class="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl bg-[#047857] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#065F46]"
                                 >
-                                    <i data-lucide="check" class="h-3.5 w-3.5"></i>
+                                    <i data-lucide="check" class="h-3.5 w-3.5" aria-hidden="true"></i>
                                     Setujui
                                 </button>
                                 <button
@@ -123,9 +140,9 @@
                                         action: @js(route('panel.permohonan.decide', $r->code)),
                                         note: ''
                                     })"
-                                    class="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#B91C1C] transition hover:bg-red-50"
+                                    class="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-bold text-[#B91C1C] transition hover:bg-red-50"
                                 >
-                                    <i data-lucide="x" class="h-3.5 w-3.5"></i>
+                                    <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
                                     Tolak
                                 </button>
                             </div>
@@ -142,16 +159,16 @@
 
     <!-- Decision Modal -->
     <template x-if="modalOpen">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="modalOpen = false" @keydown.escape.window="modalOpen = false">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-950/55 backdrop-blur-xs sm:place-items-center sm:p-6" @click.self="modalOpen = false" @keydown.escape.window="modalOpen = false">
             <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
-                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
+                <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
                         <p class="font-mono text-xs font-bold text-[#0069A8]" x-text="target.code"></p>
                         <h2 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900" x-text="target.mode === 'disetujui' ? 'Setujui permohonan akses?' : 'Tolak permohonan akses?'"></h2>
-                        <p class="mt-1 text-xs text-slate-500" x-text="target.requester + ' · ' + target.datasetTitle"></p>
+                        <p class="mt-1 text-xs text-[#475569]" x-text="target.requester + ' · ' + target.datasetTitle"></p>
                     </div>
                     <button type="button" @click="modalOpen = false" aria-label="Tutup" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-[#0069A8] hover:text-[#0069A8]">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
 
@@ -161,7 +178,7 @@
                     <input type="hidden" name="tab" value="{{ $tab }}">
 
                     <div class="space-y-4 overflow-y-auto px-5 py-6 sm:px-8">
-                        <p class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600" x-show="target.mode === 'disetujui'">
+                        <p class="rounded-xl border border-slate-200 bg-[#F8FAFC] px-4 py-3 text-xs leading-relaxed text-slate-600" x-show="target.mode === 'disetujui'">
                             Setelah disetujui, pemohon dapat melihat pratinjau serta mengunduh CSV dan XLSX dataset ini melalui halaman katalog Dataset.
                         </p>
 
@@ -219,11 +236,17 @@ function permohonanManager() {
     const serverNoteError = @js($serverNoteError);
 
     return {
+        quickSearch: '',
         modalOpen: Boolean(initialReopen),
         target: initialReopen || { code: '', datasetTitle: '', requester: '', mode: 'disetujui', action: '', note: '' },
         note: initialReopen ? (initialReopen.note || '') : '',
         tried: Boolean(initialReopen && serverNoteError),
         serverErr: serverNoteError || '',
+
+        matchesSearch(haystack) {
+            const q = this.quickSearch.trim().toLowerCase();
+            return !q || String(haystack || '').includes(q);
+        },
 
         openDecision(data) {
             this.target = data;

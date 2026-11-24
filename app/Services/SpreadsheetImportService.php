@@ -41,7 +41,9 @@ class SpreadsheetImportService
     public function mapRowsToForm(DataForm $form, array $headers, array $rows): array
     {
         $form->loadMissing('kolomFormulir');
-        $fields = $form->kolomFormulir->values();
+        $fields = $form->kolomFormulir
+            ->filter(fn ($col): bool => $col->isInputField())
+            ->values();
 
         if ($fields->isEmpty() || empty($rows)) {
             return [];

@@ -1,3 +1,18 @@
+import { gformStudio } from './gform-studio.js';
+import { publicGFormRunner, submissionFixEditor } from './gform-runner.js';
+
+window.gformStudio = gformStudio;
+window.publicGFormRunner = publicGFormRunner;
+window.submissionFixEditor = submissionFixEditor;
+
+document.addEventListener('alpine:init', () => {
+    if (window.Alpine?.data) {
+        window.Alpine.data('gformStudio', gformStudio);
+        window.Alpine.data('publicGFormRunner', publicGFormRunner);
+        window.Alpine.data('submissionFixEditor', submissionFixEditor);
+    }
+});
+
 const palettes = {
     sky: ['#0069a8', '#00a6f4', '#74d4ff', '#182654', '#0284c7', '#64748b'],
     blue: ['#182654', '#1e3575', '#0069a8', '#00a6f4', '#74d4ff', '#64748b'],
@@ -437,10 +452,17 @@ window.initDataScene = function initDataScene(el) {
     el.dataset.sceneMounted = '1';
 
     const variant = el.getAttribute('data-scene') || 'orbit';
+    const isWaliVariant = variant === 'walidata-pipeline' || variant === 'walidata-header';
     const load = () => {
-        import('./three-scenes.js')
-            .then(({ mountThreeScene }) => mountThreeScene(el, variant))
-            .catch(() => {});
+        if (isWaliVariant) {
+            import('./walidata-stage.js')
+                .then(({ mountWaliDataScene }) => mountWaliDataScene(el, variant))
+                .catch(() => {});
+        } else {
+            import('./three-scenes.js')
+                .then(({ mountThreeScene }) => mountThreeScene(el, variant))
+                .catch(() => {});
+        }
     };
 
     if ('IntersectionObserver' in window) {
