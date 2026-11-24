@@ -5,51 +5,71 @@
 @section('panel_content')
 @php
     $isAdmin = auth()->user()->isAdmin();
+    $pageTotal = $datasets->total();
+    $pagePublished = $datasets->getCollection()->filter(fn ($d) => $d->isPublished())->count();
+    $pagePublic = $datasets->getCollection()->filter(fn ($d) => $d->access === 'public')->count();
 @endphp
 
 <div x-data="manageDatasetManager()">
     <x-panel-head
+        eyebrow="TAHAP 04 · KATALOG &amp; TATA KELOLA"
+        scene="dataset"
+        badge="{{ $pageTotal }} Dataset"
+        badgeTone="emerald"
         title="Kelola Dataset"
         desc="Susun dataset dari formulir yang telah lulus fase Pre-processing, atur status Draft/Terpublikasi dan akses Publik/Private."
     >
-        <button type="button" @click="openBuilder()" {{ empty($builderFormsPayload) ? 'disabled' : '' }} class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#0069A8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#182654] disabled:cursor-not-allowed disabled:opacity-45">
+        <button type="button"
+                @click="openBuilder()"
+                {{ empty($builderFormsPayload) ? 'disabled' : '' }}
+                class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2.5 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8] disabled:cursor-not-allowed disabled:opacity-45">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
             Buat dataset dari formulir
         </button>
     </x-panel-head>
 
-    <form method="GET" action="{{ route('panel.dataset') }}" class="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-surface p-3">
-        <label class="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
+    <!-- Compact Inline Telemetry Strip -->
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 px-1 text-xs font-medium text-[#475569]">
+        <div class="flex flex-wrap items-center gap-4">
+            <span>Total katalog: <strong class="font-mono text-slate-900">{{ $pageTotal }}</strong></span>
+            <span>Terbit (halaman ini): <strong class="font-mono text-[#0069A8]">{{ $pagePublished }}</strong></span>
+            <span>Akses publik (halaman ini): <strong class="font-mono text-[#047857]">{{ $pagePublic }}</strong></span>
+        </div>
+        <span class="font-mono text-[11px] text-slate-500">Sinkronisasi ulang otomatis memvalidasi status Pre-processing sumber</span>
+    </div>
+
+    <form method="GET" action="{{ route('panel.dataset') }}" class="wd-bento mb-5 flex flex-wrap items-center gap-2 p-3">
+        <label class="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 focus-within:border-[#0069A8] focus-within:bg-white">
             <i data-lucide="search" class="h-4 w-4 text-[#475569]" aria-hidden="true"></i>
             <input type="text" name="q" value="{{ $q }}" placeholder="Cari dataset..." class="min-w-0 flex-1 bg-transparent text-sm outline-none" />
         </label>
-        <select name="kategori" onchange="this.form.submit()" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-[#0069A8]">
+        <select name="kategori" onchange="this.form.submit()" class="h-10 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 text-sm text-slate-800 outline-none focus:border-[#0069A8] focus:bg-white">
             <option value="all">Semua kategori</option>
             @foreach($categories as $c)
                 <option value="{{ $c->code }}" {{ $kategori === $c->code ? 'selected' : '' }}>{{ $c->name }}</option>
             @endforeach
         </select>
-        <select name="tahun" onchange="this.form.submit()" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-[#0069A8]">
+        <select name="tahun" onchange="this.form.submit()" class="h-10 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 text-sm text-slate-800 outline-none focus:border-[#0069A8] focus:bg-white">
             <option value="all">Semua tahun</option>
             @foreach($years as $y)
                 <option value="{{ $y }}" {{ $tahun === (string) $y ? 'selected' : '' }}>{{ $y }}</option>
             @endforeach
         </select>
-        <button type="submit" class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+        <button type="submit" class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">
             Cari
         </button>
     </form>
 
-    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-surface">
+    <div class="wd-bento overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[860px]">
-                <thead class="bg-surface-strong">
+            <table class="wd-hairline-table min-w-[860px]">
+                <thead>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">Dataset &amp; Sumber</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">Periode &amp; Baris</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">Publikasi</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">Akses</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase">Aksi</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Dataset &amp; Sumber</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Periode &amp; Baris</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Publikasi</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Akses</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,8 +88,8 @@
                                 'format' => $d->format,
                             ];
                         @endphp
-                        <tr class="border-t border-slate-200/70 hover:bg-white">
-                            <td class="px-4 py-3 text-sm text-slate-600">
+                        <tr class="transition-colors hover:bg-[#F8FAFC]">
+                            <td class="px-4 py-3.5 text-sm text-slate-600">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#0069A8]">{{ $d->code }}</span>
                                     @if($d->sourceForm)
@@ -81,16 +101,17 @@
                                     {{ $d->category?->name }} · {{ $d->format }} · diperbarui {{ $d->updated_label ?? ($d->updated_at?->locale('id')->translatedFormat('j M Y') ?? '-') }}
                                 </p>
                             </td>
-                            <td class="px-4 py-3 text-sm whitespace-nowrap text-slate-700">
+                            <td class="px-4 py-3.5 text-sm whitespace-nowrap text-slate-700">
                                 <p class="font-semibold">{{ $d->tahun }} · {{ $d->periode }}</p>
-                                <p class="text-xs tabular-nums text-[#475569]">{{ count($d->rows ?? []) }} baris · {{ count($d->cols ?? []) }} kolom</p>
+                                <p class="font-mono text-xs tabular-nums text-[#475569]">{{ count($d->rows ?? []) }} baris · {{ count($d->cols ?? []) }} kolom</p>
                             </td>
-                            <td class="px-4 py-3 text-sm text-slate-600">
+                            <td class="px-4 py-3.5 text-sm text-slate-600">
                                 <div class="flex items-center gap-2" x-data="{ published: @js($d->isPublished()), busy: false }">
                                     <button
                                         type="button"
                                         role="switch"
                                         :aria-checked="published"
+                                        :aria-busy="busy"
                                         aria-label="Terpublikasi"
                                         :disabled="busy"
                                         @click="
@@ -109,7 +130,7 @@
                                             }).finally(() => busy = false);
                                         "
                                         :class="published ? 'bg-[#0069A8]' : 'bg-slate-300'"
-                                        class="relative h-6 w-11 shrink-0 rounded-full transition"
+                                        class="relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60"
                                     >
                                         <span :class="published ? 'left-[22px]' : 'left-0.5'" class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition"></span>
                                     </button>
@@ -117,12 +138,13 @@
                                     <span x-show="!published" x-cloak class="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">Draft</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-sm text-slate-600">
+                            <td class="px-4 py-3.5 text-sm text-slate-600">
                                 <div class="flex items-center gap-2" x-data="{ pub: @js($d->access === 'public'), busy: false }">
                                     <button
                                         type="button"
                                         role="switch"
                                         :aria-checked="pub"
+                                        :aria-busy="busy"
                                         aria-label="Publik"
                                         :disabled="busy"
                                         @click="
@@ -141,7 +163,7 @@
                                             }).finally(() => busy = false);
                                         "
                                         :class="pub ? 'bg-[#047857]' : 'bg-slate-300'"
-                                        class="relative h-6 w-11 shrink-0 rounded-full transition"
+                                        class="relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60"
                                     >
                                         <span :class="pub ? 'left-[22px]' : 'left-0.5'" class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition"></span>
                                     </button>
@@ -149,7 +171,7 @@
                                     <span x-show="!pub" x-cloak class="inline-flex items-center gap-1 rounded-md bg-[#fffbeb] px-2 py-0.5 text-[11px] font-bold text-[#92400e]">Private</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-sm text-slate-600">
+                            <td class="px-4 py-3.5 text-sm text-slate-600">
                                 <div class="flex justify-end gap-1.5">
                                     @if($d->id_formulir_sumber)
                                         <form method="POST" action="{{ route('panel.dataset.sync', $d->code) }}" class="inline">
@@ -158,7 +180,7 @@
                                                     class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-[#0069A8] hover:text-[#0069A8]"
                                                     title="Sinkronkan ulang dari formulir sumber"
                                                     aria-label="Sinkronkan ulang">
-                                                <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+                                                <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
                                             </button>
                                         </form>
                                     @endif
@@ -166,13 +188,13 @@
                                             @click="openPreview(@js(route('dataset.preview', $d->code)))"
                                             class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-[#0069A8] hover:text-[#0069A8]"
                                             aria-label="Lihat">
-                                        <i data-lucide="eye" class="h-4 w-4"></i>
+                                        <i data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
                                     </button>
                                     <button type="button"
                                             @click="openEdit(@js($editPayload))"
                                             class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-[#0069A8] hover:text-[#0069A8]"
                                             aria-label="Ubah">
-                                        <i data-lucide="pencil" class="h-4 w-4"></i>
+                                        <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>
                                     </button>
                                     @if($isAdmin)
                                         <button type="button"
@@ -183,7 +205,7 @@
                                                 })"
                                                 class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-[#B91C1C]"
                                                 aria-label="Hapus">
-                                            <i data-lucide="trash-2" class="h-4 w-4"></i>
+                                            <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>
                                         </button>
                                     @endif
                                 </div>
@@ -192,7 +214,10 @@
                     @empty
                         <tr>
                             <td colspan="5" class="px-6 py-12 text-center">
-                                <p class="text-sm font-bold text-slate-800">Belum ada dataset tersedia</p>
+                                <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F0F9FF] text-[#0069A8]">
+                                    <i data-lucide="table-2" class="h-6 w-6" aria-hidden="true"></i>
+                                </span>
+                                <p class="mt-3 text-sm font-bold text-slate-800">Belum ada dataset tersedia</p>
                                 <p class="mt-1 text-xs text-[#475569]">Buat formulir pengumpulan data, selesaikan fase Pre-processing, lalu susun dataset dari formulir tersebut.</p>
                             </td>
                         </tr>
@@ -205,9 +230,9 @@
 
     <!-- Preview Modal -->
     <template x-if="previewOpen && previewData">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="previewOpen = false" @keydown.escape.window="previewOpen = false">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-950/55 backdrop-blur-xs sm:place-items-center sm:p-6" @click.self="previewOpen = false" @keydown.escape.window="previewOpen = false">
             <div role="dialog" aria-modal="true" aria-labelledby="panel-dataset-preview-title" class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
-                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
+                <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
                         <p class="flex flex-wrap items-center gap-2 text-sm text-[#475569]">
                             <span>Dataset › <span x-text="previewData.category"></span></span>
@@ -225,17 +250,17 @@
                 <div class="overflow-auto px-5 py-5 sm:px-8">
                     <div class="overflow-hidden rounded-xl border border-slate-200">
                         <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead class="bg-surface-strong">
+                            <table class="wd-hairline-table">
+                                <thead>
                                     <tr>
                                         <template x-for="c in previewData.cols" :key="c">
-                                            <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-[#475569] uppercase" x-text="c"></th>
+                                            <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase" x-text="c"></th>
                                         </template>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <template x-for="(r, idx) in previewData.rows" :key="idx">
-                                        <tr class="border-t border-slate-100 hover:bg-sky-50/50">
+                                        <tr class="hover:bg-sky-50/50">
                                             <template x-for="(val, cIdx) in r" :key="cIdx">
                                                 <td class="px-4 py-3 text-sm tabular-nums text-slate-600" x-text="val"></td>
                                             </template>
@@ -258,9 +283,9 @@
 
     <!-- Edit Metadata Modal -->
     <template x-if="editOpen && editTarget">
-        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="editOpen = false" @keydown.escape.window="editOpen = false">
+        <div class="fixed inset-0 z-50 grid place-items-end bg-slate-950/55 backdrop-blur-xs sm:place-items-center sm:p-6" @click.self="editOpen = false" @keydown.escape.window="editOpen = false">
             <div role="dialog" aria-modal="true" aria-labelledby="panel-dataset-edit-title" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
-                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
+                <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
                         <p class="text-sm font-mono font-semibold text-[#475569]" x-text="editTarget.code"></p>
                         <h2 id="panel-dataset-edit-title" class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">Ubah dataset</h2>

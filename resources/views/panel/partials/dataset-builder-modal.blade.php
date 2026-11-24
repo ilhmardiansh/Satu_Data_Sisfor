@@ -1,14 +1,14 @@
-<template x-if="builderOpen">
-    <div class="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 sm:place-items-center sm:p-6" @click.self="builderOpen = false" @keydown.escape.window="builderOpen = false">
+<template x-teleport="body">
+    <div x-show="builderOpen" x-cloak class="fixed inset-0 z-[65] grid place-items-end bg-slate-950/55 backdrop-blur-xs sm:place-items-center sm:p-6" @click.self="builderOpen = false" @keydown.escape.window="builderOpen = false">
         <div role="dialog" aria-modal="true" aria-labelledby="dataset-builder-title" class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
-            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                 <div class="min-w-0">
-                    <p class="text-xs font-bold tracking-wider text-[#0069A8] uppercase">Susun Dataset dari Data Tervalidasi</p>
+                    <p class="font-mono text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Susun Dataset dari Data Tervalidasi</p>
                     <h2 id="dataset-builder-title" class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">Buat dataset dari formulir siap pakai</h2>
                     <p class="mt-1 text-sm text-[#475569]">Hanya formulir yang telah lulus fase Pre-processing beserta baris berstatus valid yang dapat dikemas menjadi dataset.</p>
                 </div>
                 <button type="button" @click="builderOpen = false" aria-label="Tutup" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
 

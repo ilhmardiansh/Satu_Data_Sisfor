@@ -914,4 +914,1056 @@ class SatuDataTest extends TestCase
             ->assertRedirect(route('panel.ringkasan'))
             ->assertSessionHas('success');
     }
+
+    public function test_full_page_gform_studio_routes_templates_duplicate_and_media_upload(): void
+    {
+        Storage::fake('local');
+
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $admin = User::query()->where('nim', 'admin')->firstOrFail();
+        $produsen = User::query()->where('nim', '1462200031')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+
+        // Gallery page uses dedicated new pages instead of a create/edit popup modal
+        $this->actingAs($wali)->get(route('panel.formulir'))
+            ->assertStatus(200)
+            ->assertSee(route('panel.formulir.create'), false)
+            ->assertDontSee('form-builder-title', false);
+
+        // Full-page Create Studio + Template Support
+        $this->actingAs($wali)->get(route('panel.formulir.create'))
+            ->assertStatus(200)
+            ->assertSee('gform-studio-data', false);
+
+        $this->actingAs($wali)->get(route('panel.formulir.create', ['template' => 'survei-likert']))
+            ->assertStatus(200)
+            ->assertSee('Survei Kepuasan Layanan Prodi Sistem Informasi', false);
+
+        $this->actingAs($admin)->get(route('panel.formulir.create'))
+            ->assertStatus(200);
+
+        $this->actingAs($produsen)->get(route('panel.formulir.create'))
+            ->assertStatus(403);
+
+        // Upload & serve media image safely
+        $img = UploadedFile::fake()->image('banner-unusa.png', 1200, 300);
+        $uploadRes = $this->actingAs($wali)->postJson(route('panel.formulir.media.upload'), [
+            'image' => $img,
+        ]);
+        $uploadRes->assertStatus(201);
+        $mediaPath = (string) $uploadRes->json('path');
+        $this->assertNotEmpty($mediaPath);
+        Storage::disk('local')->assertExists($mediaPath);
+
+        $this->get(route('formulir.media', ['path' => $mediaPath]))
+            ->assertStatus(200);
+
+        $this->get('/formulir-media/../../.env')
+            ->assertStatus(404);
+
+        // Create a form and test full-page Edit Studio & Duplicate
+        $form = DataForm::create([
+            'code' => 'F-STUDIO-01',
+            'id_kategori' => $category->id,
+            'judul' => 'Instrumen Studio Full Page',
+            'deskripsi' => 'Uji halaman ubah khusus',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->addDays(10),
+            'status_aktif' => true,
+            'pengaturan' => [
+                'theme' => ['palette' => 'benhur', 'header_preset' => 'benhur-arch'],
+                'is_quiz' => true,
+            ],
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $form->syncFields([
+            [
+                'id' => 'skala_1',
+                'label' => 'Penilaian Layanan',
+                'type' => 'linear_scale',
+                'required' => true,
+                'config' => ['scale_min' => 1, 'scale_max' => 5, 'scale_min_label' => 'Kurang', 'scale_max_label' => 'Sangat Baik'],
+            ],
+        ]);
+
+        $this->actingAs($wali)->get(route('panel.formulir.edit', $form->code))
+            ->assertStatus(200)
+            ->assertSee('Instrumen Studio Full Page', false);
+
+        $this->actingAs($produsen)->get(route('panel.formulir.edit', $form->code))
+            ->assertStatus(403);
+
+        $dupRes = $this->actingAs($wali)->post(route('panel.formulir.duplicate', $form->code));
+        $cloned = DataForm::query()->where('judul', 'Instrumen Studio Full Page (Salinan)')->firstOrFail();
+        $dupRes->assertRedirect(route('panel.formulir.edit', $cloned->code));
+        $this->assertSame('benhur', $cloned->settings['theme']['palette'] ?? null);
+        $this->assertSame(1, $cloned->kolomFormulir()->count());
+    }
+
+    public function test_full_gform_types_validation_branching_quiz_preprocessing_and_dataset_compatibility(): void
+    {
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $mhs1 = User::query()->where('nim', '1462200031')->firstOrFail();
+        $mhs2 = User::query()->where('nim', '1462300012')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+
+        $fieldsPayload = [
+            [
+                'id' => 'sec_1',
+                'label' => 'Bagian 1: Profil & Evaluasi',
+                'help' => 'Bagian awal survei',
+                'type' => 'section',
+                'required' => false,
+                'config' => ['after_action' => 'next'],
+            ],
+            [
+                'id' => 'blk_info',
+                'label' => 'Petunjuk Umum',
+                'help' => 'Isi seluruh pertanyaan dengan jujur.',
+                'type' => 'title_block',
+                'required' => false,
+                'config' => [],
+            ],
+            [
+                'id' => 'blk_vid',
+                'label' => 'Video Panduan',
+                'help' => '',
+                'type' => 'video_block',
+                'required' => false,
+                'config' => ['video_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'video_caption' => 'Panduan'],
+            ],
+            [
+                'id' => 'email_mhs',
+                'label' => 'Email Aktif',
+                'help' => '',
+                'type' => 'text',
+                'required' => true,
+                'config' => [
+                    'validation' => ['enabled' => true, 'category' => 'text', 'operator' => 'email', 'message' => 'Email harus valid.'],
+                    'points' => 20,
+                    'answer_key' => 'budi@student.unusa.ac.id',
+                ],
+            ],
+            [
+                'id' => 'jalur',
+                'label' => 'Jalur',
+                'help' => '',
+                'type' => 'radio',
+                'required' => true,
+                'options' => ['Reguler', 'Prestasi'],
+                'config' => [
+                    'allow_other' => true,
+                    'use_branching' => true,
+                    'branching' => ['Reguler' => 'sec_end'],
+                    'points' => 30,
+                    'answer_key' => 'Prestasi',
+                ],
+            ],
+            [
+                'id' => 'kepuasan',
+                'label' => 'Skala Kepuasan',
+                'help' => '',
+                'type' => 'linear_scale',
+                'required' => true,
+                'config' => ['scale_min' => 1, 'scale_max' => 5, 'scale_min_label' => 'Rendah', 'scale_max_label' => 'Tinggi'],
+            ],
+            [
+                'id' => 'bintang',
+                'label' => 'Rating Fasilitas',
+                'help' => '',
+                'type' => 'rating',
+                'required' => true,
+                'config' => ['rating_max' => 5, 'rating_icon' => 'star'],
+            ],
+            [
+                'id' => 'kisi_mc',
+                'label' => 'Kisi Evaluasi',
+                'help' => '',
+                'type' => 'mc_grid',
+                'required' => true,
+                'config' => [
+                    'grid_rows' => ['Dosen', 'Lab'],
+                    'grid_cols' => ['Cukup', 'Baik'],
+                    'require_row_response' => true,
+                    'limit_one_per_col' => true,
+                ],
+            ],
+            [
+                'id' => 'jam_kegiatan',
+                'label' => 'Jam Konsultasi',
+                'help' => '',
+                'type' => 'time',
+                'required' => true,
+                'config' => ['time_mode' => 'time'],
+            ],
+            [
+                'id' => 'sec_skip',
+                'label' => 'Bagian 2: Khusus Prestasi',
+                'help' => '',
+                'type' => 'section',
+                'required' => false,
+                'config' => ['after_action' => 'next'],
+            ],
+            [
+                'id' => 'nama_lomba',
+                'label' => 'Nama Lomba Wajib',
+                'help' => '',
+                'type' => 'text',
+                'required' => true,
+                'config' => [],
+            ],
+            [
+                'id' => 'sec_end',
+                'label' => 'Bagian 3: Penutup',
+                'help' => '',
+                'type' => 'section',
+                'required' => false,
+                'config' => ['after_action' => 'submit'],
+            ],
+            [
+                'id' => 'catatan',
+                'label' => 'Catatan Tambahan',
+                'help' => '',
+                'type' => 'textarea',
+                'required' => false,
+                'config' => [],
+            ],
+        ];
+
+        $settingsPayload = [
+            'theme' => ['palette' => 'cyan', 'header_preset' => 'cyan-wave'],
+            'is_quiz' => true,
+            'release_grade' => 'immediately',
+            'show_progress_bar' => true,
+            'confirmation_message' => 'Terima kasih sudah mengisi survei UNUSA!',
+        ];
+
+        $this->actingAs($wali)->post(route('panel.formulir.store'), [
+            'title' => 'Survei Lengkap GForm Full Asset',
+            'description' => 'Semua fitur GForm',
+            'category_id' => $category->id,
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'batasi_satu_respon' => '0',
+            'deadline' => now()->addDays(10)->format('Y-m-d\TH:i'),
+            'fields_json' => json_encode($fieldsPayload, JSON_THROW_ON_ERROR),
+            'settings_json' => json_encode($settingsPayload, JSON_THROW_ON_ERROR),
+        ])->assertRedirect(route('panel.formulir'))
+            ->assertSessionHas('success', 'Formulir Berhasil Dibuat');
+
+        $form = DataForm::query()->where('judul', 'Survei Lengkap GForm Full Asset')->firstOrFail();
+
+        // Non-input blocks exist in ->items, excluded from ->fields and ->sourceCols()
+        $this->assertCount(13, $form->items);
+        $this->assertCount(8, $form->fields);
+        $this->assertCount(11, $form->sourceCols()); // 3 meta + 8 input columns
+
+        // Respondent page renders all sections, videos, grids, scale, rating
+        $this->actingAs($mhs1)->get(route('formulir.show', $form->code))
+            ->assertStatus(200)
+            ->assertSee('Skala Kepuasan', false)
+            ->assertSee('Kisi Evaluasi', false)
+            ->assertSee('youtube-nocookie.com/embed/dQw4w9WgXcQ', false);
+
+        // Invalid custom email validation + grid column uniqueness rejection
+        $this->actingAs($mhs1)->postJson(route('panel.isi.submit', $form->code), [
+            'values' => [
+                'email_mhs' => 'bukan-email',
+                'jalur' => 'Reguler',
+                'kepuasan' => '5',
+                'bintang' => '4',
+                'kisi_mc' => [0 => 'Baik', 1 => 'Baik'],
+                'jam_kegiatan' => '09:30',
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['email_mhs', 'kisi_mc']);
+
+        // Valid branched submission: chooses 'Reguler' -> skips 'sec_skip' ('nama_lomba' required is bypassed!)
+        $validRes = $this->actingAs($mhs1)->post(route('panel.isi.submit', $form->code), [
+            'values' => [
+                'email_mhs' => 'budi@student.unusa.ac.id',
+                'jalur' => 'Reguler',
+                'kepuasan' => '5',
+                'bintang' => '4',
+                'kisi_mc' => [0 => 'Baik', 1 => 'Cukup'],
+                'jam_kegiatan' => '09:30',
+                'catatan' => 'Sangat membantu',
+            ],
+        ]);
+        $validRes->assertRedirect();
+        $validRes->assertSessionHas('quiz_result');
+        $quizResult = session('quiz_result');
+        $this->assertSame(20, $quizResult['earned']);
+        $this->assertSame(50, $quizResult['possible']);
+
+        // Second submission with 'allow_other' custom value & visiting skipped section
+        $this->actingAs($mhs2)->postJson(route('panel.isi.submit', $form->code), [
+            'values' => [
+                'email_mhs' => 'siti@student.unusa.ac.id',
+                'jalur' => '__other__',
+                'kepuasan' => '4',
+                'bintang' => '5',
+                'kisi_mc' => [0 => 'Cukup', 1 => 'Baik'],
+                'jam_kegiatan' => '14:00',
+                'nama_lomba' => 'Gemastik 2026',
+            ],
+            'values_other' => [
+                'jalur' => 'Jalur Mandiri Inovasi',
+            ],
+        ])->assertStatus(201);
+
+        // Pre-processing finalization + Dataset Rekap AVG on linear_scale passes cleanly!
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
+            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertSessionHas('success');
+        $this->assertTrue($form->fresh()->isPreprocessed());
+
+        $this->actingAs($wali)->post(route('panel.dataset.from-form'), [
+            'form_id' => $form->id,
+            'mode' => 'rekap',
+            'group_field_id' => 'jalur',
+            'agg_func' => 'avg',
+            'agg_field_id' => 'kepuasan',
+            'title' => 'Rekap Rata-rata Kepuasan Jalur 2026',
+            'category_id' => $category->id,
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'access' => 'public',
+            'publish_status' => 'terpublikasi',
+            'format' => 'CSV',
+        ])->assertRedirect(route('panel.dataset'))
+            ->assertSessionHas('success');
+
+        $ds = Dataset::query()->where('judul', 'Rekap Rata-rata Kepuasan Jalur 2026')->firstOrFail();
+        $assoc = collect($ds->baris)->mapWithKeys(fn (array $r): array => [(string) $r[0] => $r[1]])->all();
+        $this->assertSame(5, $assoc['Reguler']);
+        $this->assertSame(4, $assoc['Jalur Mandiri Inovasi']);
+    }
+
+    public function test_unrestricted_and_chunked_large_file_uploads_with_security_blocklist(): void
+    {
+        Storage::fake('local');
+
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $mhs1 = User::query()->where('nim', '1462200031')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+
+        // 1. Create form with unrestricted file type & unlimited file size (file_max_mb = 0)
+        $this->actingAs($wali)->post(route('panel.formulir.store'), [
+            'title' => 'Unggahan Bebas Jenis & Ukuran 2026',
+            'description' => 'Mendukung DOCX, ZIP, MP4, PDF tanpa batas PHP 2M',
+            'category_id' => $category->id,
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'deadline' => now()->addDays(7)->format('Y-m-d\TH:i'),
+            'fields_json' => json_encode([
+                [
+                    'id' => 'dokumen',
+                    'label' => 'Berkas Bebas',
+                    'type' => 'file',
+                    'required' => true,
+                    'config' => [
+                        'restrict_file_types' => false,
+                        'file_max_count' => 1,
+                        'file_max_mb' => 0,
+                    ],
+                ],
+                [
+                    'id' => 'khusus_pdf',
+                    'label' => 'Khusus PDF',
+                    'type' => 'file',
+                    'required' => false,
+                    'config' => [
+                        'restrict_file_types' => true,
+                        'file_types' => ['pdf'],
+                        'file_max_count' => 1,
+                        'file_max_mb' => 25,
+                    ],
+                ],
+            ], JSON_THROW_ON_ERROR),
+        ])->assertRedirect(route('panel.formulir'));
+
+        $form = DataForm::query()->where('judul', 'Unggahan Bebas Jenis & Ukuran 2026')->firstOrFail();
+        $this->actingAs($mhs1)->get(route('formulir.show', $form->code))
+            ->assertStatus(200)
+            ->assertSee('Semua jenis berkas', false)
+            ->assertSee('tanpa batas ukuran', false);
+
+        // 2. Reject dangerous executable script extension (.php)
+        $this->actingAs($mhs1)->call(
+            'POST',
+            route('panel.isi.upload-chunk', $form->code),
+            [],
+            [],
+            [],
+            [
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_X_FIELD_ID' => 'dokumen',
+                'HTTP_X_UPLOAD_ID' => 'bad_php_1',
+                'HTTP_X_CHUNK_INDEX' => '0',
+                'HTTP_X_TOTAL_CHUNKS' => '1',
+                'HTTP_X_FILE_NAME' => rawurlencode('exploit.php'),
+            ],
+            '<?php echo 1;'
+        )->assertStatus(422);
+
+        // 3. Reject disallowed format (.zip) on PDF-restricted field
+        $this->actingAs($mhs1)->call(
+            'POST',
+            route('panel.isi.upload-chunk', $form->code),
+            [],
+            [],
+            [],
+            [
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_X_FIELD_ID' => 'khusus_pdf',
+                'HTTP_X_UPLOAD_ID' => 'bad_zip_1',
+                'HTTP_X_CHUNK_INDEX' => '0',
+                'HTTP_X_TOTAL_CHUNKS' => '1',
+                'HTTP_X_FILE_NAME' => rawurlencode('archive.zip'),
+            ],
+            'PKZIPCONTENT'
+        )->assertStatus(422);
+
+        // 4. Multi-chunk binary upload for a .zip archive (>2 chunks assembled cleanly)
+        $part1 = str_repeat('A', 600000);
+        $part2 = str_repeat('B', 600000);
+
+        $chunkRes1 = $this->actingAs($mhs1)->call(
+            'POST',
+            route('panel.isi.upload-chunk', $form->code),
+            [],
+            [],
+            [],
+            [
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_X_FIELD_ID' => 'dokumen',
+                'HTTP_X_UPLOAD_ID' => 'zip_multi_1',
+                'HTTP_X_CHUNK_INDEX' => '0',
+                'HTTP_X_TOTAL_CHUNKS' => '2',
+                'HTTP_X_FILE_NAME' => rawurlencode('laporan-proyek.zip'),
+            ],
+            $part1
+        );
+        $chunkRes1->assertStatus(200)->assertJsonPath('completed', false);
+
+        $chunkRes2 = $this->actingAs($mhs1)->call(
+            'POST',
+            route('panel.isi.upload-chunk', $form->code),
+            [],
+            [],
+            [],
+            [
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_X_FIELD_ID' => 'dokumen',
+                'HTTP_X_UPLOAD_ID' => 'zip_multi_1',
+                'HTTP_X_CHUNK_INDEX' => '1',
+                'HTTP_X_TOTAL_CHUNKS' => '2',
+                'HTTP_X_FILE_NAME' => rawurlencode('laporan-proyek.zip'),
+            ],
+            $part2
+        );
+        $chunkRes2->assertStatus(201)->assertJsonPath('completed', true);
+        $token = (string) $chunkRes2->json('token');
+        $this->assertNotEmpty($token);
+
+        // Submit form with chunk token (no raw multipart file required)
+        $this->actingAs($mhs1)->postJson(route('panel.isi.submit', $form->code), [
+            'uploaded_tokens' => [
+                'dokumen' => $token,
+            ],
+        ])->assertStatus(201);
+
+        $sub = FormSubmission::query()->where('id_formulir', $form->id)->latest('id')->firstOrFail();
+        $this->assertSame('laporan-proyek.zip', $sub->values['dokumen'] ?? '');
+        $storedPath = $sub->attachments['dokumen'] ?? '';
+        $this->assertNotEmpty($storedPath);
+        $this->assertSame($part1.$part2, Storage::disk('local')->get($storedPath));
+
+        // Download & Pre-processing finalize work cleanly for .zip attachments
+        $this->actingAs($mhs1)->get(route('panel.submissions.file', [$sub->code, 'dokumen']))->assertStatus(200);
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
+            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertSessionHas('success');
+        $this->assertTrue($form->fresh()->isPreprocessed());
+
+        // 5. Direct multipart fallback also accepts .docx without failing mime check
+        $docx = UploadedFile::fake()->create('artikel.docx', 200, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $this->actingAs($mhs1)->postJson(route('panel.isi.submit', $form->code), [
+            'files' => ['dokumen' => $docx],
+        ])->assertStatus(201);
+
+        // 6. Chunked Studio image media upload succeeds
+        $mediaChunk = $this->actingAs($wali)->call(
+            'POST',
+            route('panel.formulir.media.upload'),
+            [],
+            [],
+            [],
+            [
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_X_UPLOAD_ID' => 'media_banner_1',
+                'HTTP_X_CHUNK_INDEX' => '0',
+                'HTTP_X_TOTAL_CHUNKS' => '1',
+                'HTTP_X_FILE_NAME' => rawurlencode('cover-besar.png'),
+            ],
+            'PNGDATA'
+        );
+        $mediaChunk->assertStatus(201)->assertJsonPath('completed', true);
+        $this->get(route('formulir.media', ['path' => (string) $mediaChunk->json('path')]))->assertStatus(200);
+    }
+
+    public function test_formdata_chunked_upload_zero_byte_and_empty_token_guards_and_full_page_submission_editor(): void
+    {
+        Storage::fake('local');
+
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $admin = User::query()->where('nim', 'admin')->firstOrFail();
+        $mhs = User::query()->where('nim', '1462200031')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+
+        $form = DataForm::create([
+            'code' => 'F-PROOF-FIX',
+            'id_kategori' => $category->id,
+            'judul' => 'Prestasi Mahasiswa Uji Bukti',
+            'deskripsi' => 'Uji unggahan bukti dan perbaikan halaman penuh',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->addDays(7),
+            'status_aktif' => true,
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $form->syncFields([
+            ['id' => 'judul_kegiatan', 'label' => 'Nama Kompetisi', 'type' => 'text', 'required' => true],
+            ['id' => 'tingkat', 'label' => 'Tingkat Capaian', 'type' => 'radio', 'required' => true, 'options' => ['Kota / Provinsi', 'Nasional', 'Internasional']],
+            ['id' => 'poin', 'label' => 'Jumlah Peserta', 'type' => 'number', 'required' => true],
+            ['id' => 'bukti', 'label' => 'Unggah Sertifikat / Surat Tugas', 'type' => 'file', 'required' => true, 'config' => ['restrict_file_types' => false, 'file_max_mb' => 0, 'file_max_count' => 1]],
+        ]);
+
+        // 1. Reject 0-byte chunk on public submission upload-chunk endpoint
+        $emptyChunk = UploadedFile::fake()->createWithContent('empty.pdf', '');
+        $this->actingAs($mhs)->postJson(route('panel.isi.upload-chunk', $form->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'zero_test_1',
+            'chunk_index' => '0',
+            'total_chunks' => '1',
+            'file_name' => 'empty.pdf',
+            'chunk' => $emptyChunk,
+        ])->assertStatus(422);
+
+        // 2. Reject empty "[]" token array (must NEVER bypass required proof check!)
+        $this->actingAs($mhs)->postJson(route('panel.isi.submit', $form->code), [
+            'values' => [
+                'judul_kegiatan' => 'Lomba Essay Nasional',
+                'tingkat' => 'Nasional',
+                'poin' => '3',
+            ],
+            'uploaded_tokens' => [
+                'bukti' => '[]',
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['bukti']);
+
+        // 3. Multi-chunk FormData upload assembles full real bytes cleanly
+        $partA = '%PDF-1.4 '.str_repeat('X', 500000);
+        $partB = str_repeat('Y', 400000).'%%EOF';
+        $chunkFileA = UploadedFile::fake()->createWithContent('chunk.bin', $partA);
+        $chunkFileB = UploadedFile::fake()->createWithContent('chunk.bin', $partB);
+
+        $this->actingAs($mhs)->postJson(route('panel.isi.upload-chunk', $form->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'fd_pdf_1',
+            'chunk_index' => '0',
+            'total_chunks' => '2',
+            'file_name' => 'sertifikat-riset.pdf',
+            'chunk' => $chunkFileA,
+        ])->assertStatus(200)->assertJsonPath('completed', false);
+
+        $chunkDone = $this->actingAs($mhs)->postJson(route('panel.isi.upload-chunk', $form->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'fd_pdf_1',
+            'chunk_index' => '1',
+            'total_chunks' => '2',
+            'file_name' => 'sertifikat-riset.pdf',
+            'chunk' => $chunkFileB,
+        ]);
+        $chunkDone->assertStatus(201)->assertJsonPath('completed', true);
+        $token = (string) $chunkDone->json('token');
+        $this->assertNotEmpty($token);
+
+        $this->actingAs($mhs)->postJson(route('panel.isi.submit', $form->code), [
+            'values' => [
+                'judul_kegiatan' => 'Lomba Essay Nasional',
+                'tingkat' => 'Nasional',
+                'poin' => '3',
+            ],
+            'uploaded_tokens' => [
+                'bukti' => $token,
+            ],
+        ])->assertStatus(201);
+
+        $sub1 = FormSubmission::query()->where('id_formulir', $form->id)->latest('id')->firstOrFail();
+        $this->assertSame('sertifikat-riset.pdf', $sub1->values['bukti'] ?? '');
+        $storedPath1 = $sub1->attachments['bukti'] ?? '';
+        $this->assertNotEmpty($storedPath1);
+        $this->assertSame($partA.$partB, Storage::disk('local')->get($storedPath1));
+        $this->assertSame($storedPath1, $sub1->jalur_berkas_bukti);
+
+        // Both download and inline preview routes work
+        $this->actingAs($wali)->get(route('panel.submissions.file', [$sub1->code, 'bukti']))->assertStatus(200);
+        $this->actingAs($wali)->get(route('panel.submissions.file', [$sub1->code, 'bukti', 'inline' => 1]))->assertStatus(200);
+
+        // 4. Pre-processing table shows attachment links & edit page link, with NO clean-modal popup
+        $this->actingAs($wali)->get(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertStatus(200)
+            ->assertDontSee('clean-modal-title', false)
+            ->assertSee(route('panel.preprocessing.submissions.edit', $sub1->code), false)
+            ->assertSee(route('panel.submissions.file', [$sub1->code, 'bukti']), false)
+            ->assertSee('sertifikat-riset.pdf', false);
+
+        // 5. Legacy/imported broken row missing proof (bukti = "") -> fixed on dedicated full page
+        $brokenSub = FormSubmission::create([
+            'code' => 'S-BROKEN-FIX',
+            'id_formulir' => $form->id,
+            'diisi_oleh' => $mhs->id,
+            'waktu_pengisian' => now(),
+            'status_validasi' => 'mentah',
+            'sumber_input' => 'formulir',
+            'jalur_berkas_bukti' => null,
+        ]);
+        $brokenSub->syncValues($form, [
+            'judul_kegiatan' => 'lomba   karya   tulis',
+            'tingkat' => 'Nasional',
+            'poin' => '2',
+            'bukti' => '',
+        ], null, null, false);
+
+        // RBAC & pre-selected value rendering on dedicated full page
+        $this->actingAs($mhs)->get(route('panel.preprocessing.submissions.edit', $brokenSub->code))
+            ->assertStatus(403);
+        $this->actingAs($admin)->get(route('panel.preprocessing.submissions.edit', $brokenSub->code))
+            ->assertStatus(200);
+        $this->actingAs($wali)->get(route('panel.preprocessing.submissions.edit', $brokenSub->code))
+            ->assertStatus(200)
+            ->assertSee('Perbaiki Data Isian', false)
+            ->assertSee('<option value="Nasional" selected>Nasional</option>', false)
+            ->assertSee(route('panel.data.submissions.update', $brokenSub->code), false)
+            ->assertSee(json_encode(route('panel.preprocessing.submissions.upload-chunk', $brokenSub->code)), false);
+
+        // 0-byte chunk also rejected on preprocessing upload-chunk endpoint
+        $this->actingAs($wali)->postJson(route('panel.preprocessing.submissions.upload-chunk', $brokenSub->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'fix_zero_1',
+            'chunk_index' => '0',
+            'total_chunks' => '1',
+            'file_name' => 'empty.pdf',
+            'chunk' => $emptyChunk,
+        ])->assertStatus(422);
+
+        // Wali Data uploads replacement proof in FormData chunks & saves full page
+        $fixBytes = '%PDF-1.4 VALID-PROOF-BYTES '.str_repeat('Z', 30000).'%%EOF';
+        $fixChunk = UploadedFile::fake()->createWithContent('chunk.bin', $fixBytes);
+        $fixChunkRes = $this->actingAs($wali)->postJson(route('panel.preprocessing.submissions.upload-chunk', $brokenSub->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'fix_ok_1',
+            'chunk_index' => '0',
+            'total_chunks' => '1',
+            'file_name' => 'bukti-perbaikan.pdf',
+            'chunk' => $fixChunk,
+        ]);
+        $fixChunkRes->assertStatus(201)->assertJsonPath('completed', true);
+        $fixToken = (string) $fixChunkRes->json('token');
+
+        $this->actingAs($wali)->put(route('panel.data.submissions.update', $brokenSub->code), [
+            'values' => [
+                'judul_kegiatan' => 'Lomba Karya Tulis',
+                'tingkat' => 'Nasional',
+                'poin' => '2',
+            ],
+            'uploaded_tokens' => [
+                'bukti' => $fixToken,
+            ],
+        ])->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertSessionHas('success');
+
+        $brokenSub->refresh();
+        $this->assertSame('Lomba Karya Tulis', $brokenSub->values['judul_kegiatan']);
+        $this->assertSame('lomba   karya   tulis', $brokenSub->rawValues['judul_kegiatan']);
+        $this->assertSame('bukti-perbaikan.pdf', $brokenSub->values['bukti']);
+        $fixedPath = $brokenSub->attachments['bukti'] ?? '';
+        $this->assertNotEmpty($fixedPath);
+        $this->assertSame($fixBytes, Storage::disk('local')->get($fixedPath));
+        $this->assertSame($fixedPath, $brokenSub->jalur_berkas_bukti);
+
+        // Finalize preprocessing now passes!
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
+            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertSessionHas('success');
+        $this->assertTrue($form->fresh()->isPreprocessed());
+    }
+
+    public function test_preprocessing_directory_front_page_search_filters_and_dedicated_form_workbench(): void
+    {
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $admin = User::query()->where('nim', 'admin')->firstOrFail();
+        $mhs = User::query()->where('nim', '1462200031')->firstOrFail();
+        $cat1 = Category::query()->orderBy('id')->firstOrFail();
+        $cat2 = Category::query()->orderByDesc('id')->firstOrFail();
+
+        $formQueue = DataForm::create([
+            'code' => 'F-DIR-QUEUE',
+            'id_kategori' => $cat1->id,
+            'judul' => 'Pendataan Riset Antrean 2026',
+            'deskripsi' => 'Butuh pembersihan',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'status_preprocessing' => 'proses',
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $formQueue->syncFields([['id' => 'judul', 'label' => 'Judul', 'type' => 'text', 'required' => true]]);
+        FormSubmission::create([
+            'code' => 'S-DIR-Q1',
+            'id_formulir' => $formQueue->id,
+            'diisi_oleh' => $mhs->id,
+            'waktu_pengisian' => now(),
+            'status_validasi' => 'mentah',
+            'sumber_input' => 'formulir',
+        ])->syncValues($formQueue, ['judul' => 'Mini Riset A']);
+
+        $formReady = DataForm::create([
+            'code' => 'F-DIR-READY',
+            'id_kategori' => $cat2->id,
+            'judul' => 'Survei Alumni Terverifikasi 2025',
+            'deskripsi' => 'Sudah siap dataset',
+            'tahun' => 2025,
+            'periode' => 'Genap',
+            'target' => 'Semua',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'status_preprocessing' => 'siap',
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $formReady->syncFields([['id' => 'kerja', 'label' => 'Status', 'type' => 'text', 'required' => true]]);
+        FormSubmission::create([
+            'code' => 'S-DIR-R1',
+            'id_formulir' => $formReady->id,
+            'diisi_oleh' => $mhs->id,
+            'waktu_pengisian' => now(),
+            'status_validasi' => 'valid',
+            'sumber_input' => 'formulir',
+        ])->syncValues($formReady, ['kerja' => 'Bekerja']);
+
+        $formEmpty = DataForm::create([
+            'code' => 'F-DIR-EMPTY',
+            'id_kategori' => $cat1->id,
+            'judul' => 'Kuesioner Lab Kosong 2024',
+            'deskripsi' => 'Belum ada responden',
+            'tahun' => 2024,
+            'periode' => 'Ganjil',
+            'target' => 'Dosen',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'status_preprocessing' => 'belum',
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $formEmpty->syncFields([['id' => 'lab', 'label' => 'Lab', 'type' => 'text', 'required' => true]]);
+
+        // 1. /panel/preprocessing displays front-page form directory without a <select name="form"> dropdown
+        $this->actingAs($wali)->get(route('panel.preprocessing'))
+            ->assertStatus(200)
+            ->assertSee('Pilih Formulir Pre-processing', false)
+            ->assertSee('Pendataan Riset Antrean 2026', false)
+            ->assertSee('Survei Alumni Terverifikasi 2025', false)
+            ->assertSee('Kuesioner Lab Kosong 2024', false)
+            ->assertSee(route('panel.preprocessing.show', $formQueue->code), false)
+            ->assertSee(route('panel.preprocessing.show', $formReady->code), false)
+            ->assertDontSee('name="form"', false)
+            ->assertDontSee('&amp;amp;', false);
+
+        // 2. Search & filters on front directory work accurately
+        $this->actingAs($wali)->get(route('panel.preprocessing', ['q' => 'F-DIR-READY']))
+            ->assertStatus(200)
+            ->assertSee('Survei Alumni Terverifikasi 2025', false)
+            ->assertDontSee('Pendataan Riset Antrean 2026', false)
+            ->assertDontSee('Kuesioner Lab Kosong 2024', false);
+
+        $this->actingAs($wali)->get(route('panel.preprocessing', ['stage' => 'needs_attention']))
+            ->assertStatus(200)
+            ->assertSee('Pendataan Riset Antrean 2026', false)
+            ->assertDontSee('Survei Alumni Terverifikasi 2025', false)
+            ->assertDontSee('Kuesioner Lab Kosong 2024', false);
+
+        $this->actingAs($wali)->get(route('panel.preprocessing', ['stage' => 'ready', 'tahun' => '2025']))
+            ->assertStatus(200)
+            ->assertSee('Survei Alumni Terverifikasi 2025', false)
+            ->assertDontSee('Pendataan Riset Antrean 2026', false);
+
+        $this->actingAs($wali)->get(route('panel.preprocessing', ['stage' => 'empty', 'kategori' => $cat1->code]))
+            ->assertStatus(200)
+            ->assertSee('Kuesioner Lab Kosong 2024', false)
+            ->assertDontSee('Survei Alumni Terverifikasi 2025', false);
+
+        // 3. Dedicated form workbench /panel/preprocessing/{code}
+        $this->actingAs($mhs)->get(route('panel.preprocessing.show', $formQueue->code))->assertStatus(403);
+        $this->actingAs($admin)->get(route('panel.preprocessing.show', $formQueue->code))->assertStatus(200);
+        $this->actingAs($wali)->get(route('panel.preprocessing.show', $formQueue->code))
+            ->assertStatus(200)
+            ->assertSee('Pilih Formulir Lain', false)
+            ->assertSee('Pendataan Riset Antrean 2026', false)
+            ->assertSee('S-DIR-Q1', false)
+            ->assertDontSee('name="form"', false)
+            ->assertDontSee('&amp;amp;', false);
+
+        // 4. Legacy ?form= query compatibility still opens the workspace cleanly
+        $this->actingAs($wali)->get(route('panel.preprocessing', ['form' => $formReady->code]))
+            ->assertStatus(200)
+            ->assertSee('Survei Alumni Terverifikasi 2025', false)
+            ->assertSee('S-DIR-R1', false)
+            ->assertSee('Pilih Formulir Lain', false);
+    }
+
+    public function test_json_base64_chunk_upload_works_without_php_temp_files_across_all_endpoints(): void
+    {
+        Storage::fake('local');
+
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $mhs = User::query()->where('nim', '1462200031')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+
+        $form = DataForm::create([
+            'code' => 'F-B64-TEST',
+            'id_kategori' => $category->id,
+            'judul' => 'Uji JSON Base64 Upload',
+            'deskripsi' => 'Uji tanpa $_FILES tmp dir',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $form->syncFields([
+            ['id' => 'judul', 'label' => 'Judul', 'type' => 'text', 'required' => true],
+            ['id' => 'bukti', 'label' => 'Bukti', 'type' => 'file', 'required' => true, 'config' => ['restrict_file_types' => true, 'file_types' => ['pdf', 'image'], 'file_max_mb' => 5, 'file_max_count' => 1]],
+        ]);
+
+        // Reject invalid base64 payload
+        $this->actingAs($mhs)->postJson(route('panel.isi.upload-chunk', $form->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'bad_b64',
+            'chunk_index' => 0,
+            'total_chunks' => 1,
+            'file_name' => 'diagram.png',
+            'chunk_b64' => '***NOT_BASE64***',
+        ])->assertStatus(422);
+
+        // Multi-chunk PNG via JSON Base64 on public submission endpoint
+        $pngPart1 = "\x89PNG\r\n\x1a\n".random_bytes(1024);
+        $pngPart2 = random_bytes(1024).'IEND';
+
+        $this->actingAs($mhs)->postJson(route('panel.isi.upload-chunk', $form->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'ok_b64_1',
+            'chunk_index' => 0,
+            'total_chunks' => 2,
+            'file_name' => 'Sequence-8.drawio.png',
+            'chunk_b64' => base64_encode($pngPart1),
+        ])->assertStatus(200)->assertJsonPath('ok', true)->assertJsonPath('completed', false);
+
+        $done = $this->actingAs($mhs)->postJson(route('panel.isi.upload-chunk', $form->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'ok_b64_1',
+            'chunk_index' => 1,
+            'total_chunks' => 2,
+            'file_name' => 'Sequence-8.drawio.png',
+            'chunk_b64' => base64_encode($pngPart2),
+        ]);
+        $done->assertStatus(201)->assertJsonPath('ok', true)->assertJsonPath('completed', true);
+        $token = (string) $done->json('token');
+
+        $this->actingAs($mhs)->postJson(route('panel.isi.submit', $form->code), [
+            'values' => ['judul' => 'Sequence Diagram'],
+            'uploaded_tokens' => ['bukti' => $token],
+        ])->assertStatus(201);
+
+        $sub = FormSubmission::query()->where('id_formulir', $form->id)->latest('id')->firstOrFail();
+        $this->assertSame('Sequence-8.drawio.png', $sub->values['bukti']);
+        $this->assertSame($pngPart1.$pngPart2, Storage::disk('local')->get($sub->attachments['bukti']));
+        $this->actingAs($mhs)->get(route('panel.submissions.file', [$sub->code, 'bukti']))->assertStatus(200);
+
+        // Replacement via JSON Base64 on preprocessing submission edit endpoint
+        $repPdf = '%PDF-1.7 '.random_bytes(2048).'%%EOF';
+        $repRes = $this->actingAs($wali)->postJson(route('panel.preprocessing.submissions.upload-chunk', $sub->code), [
+            'field_id' => 'bukti',
+            'upload_id' => 'rep_b64_1',
+            'chunk_index' => 0,
+            'total_chunks' => 1,
+            'file_name' => 'revisi-bukti.pdf',
+            'chunk_b64' => base64_encode($repPdf),
+        ]);
+        $repRes->assertStatus(201)->assertJsonPath('completed', true);
+
+        $this->actingAs($wali)->put(route('panel.data.submissions.update', $sub->code), [
+            'values' => ['judul' => 'Sequence Diagram'],
+            'uploaded_tokens' => ['bukti' => (string) $repRes->json('token')],
+        ])->assertRedirect();
+
+        $sub->refresh();
+        $this->assertSame('revisi-bukti.pdf', $sub->values['bukti']);
+        $this->assertSame($repPdf, Storage::disk('local')->get($sub->attachments['bukti']));
+
+        // Studio header/question image upload via JSON Base64
+        $mediaRes = $this->actingAs($wali)->postJson(route('panel.formulir.media.upload'), [
+            'upload_id' => 'media_b64_1',
+            'chunk_index' => 0,
+            'total_chunks' => 1,
+            'file_name' => 'banner-studio.png',
+            'chunk_b64' => base64_encode($pngPart1),
+        ]);
+        $mediaRes->assertStatus(201)->assertJsonPath('completed', true);
+        $this->assertSame($pngPart1, Storage::disk('local')->get((string) $mediaRes->json('path')));
+    }
+
+    public function test_question_image_persistence_relative_media_url_and_header_field_fallback(): void
+    {
+        Storage::fake('local');
+
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $mhs = User::query()->where('nim', '1462200031')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+
+        $pngBytes = "\x89PNG\r\n\x1a\n".random_bytes(512);
+        $mediaRes = $this->actingAs($wali)->postJson(route('panel.formulir.media.upload'), [
+            'upload_id' => 'qimg_1',
+            'chunk_index' => 0,
+            'total_chunks' => 1,
+            'file_name' => 'soal-diagram.webp',
+            'chunk_b64' => base64_encode($pngBytes),
+        ]);
+        $mediaRes->assertStatus(201)->assertJsonPath('ok', true)->assertJsonPath('completed', true);
+        $relativeUrl = (string) $mediaRes->json('url');
+        $this->assertStringStartsWith('/formulir-media/', $relativeUrl);
+        $this->get($relativeUrl)->assertStatus(200);
+
+        $optImgRes = $this->actingAs($wali)->postJson(route('panel.formulir.media.upload'), [
+            'upload_id' => 'optimg_1',
+            'chunk_index' => 0,
+            'total_chunks' => 1,
+            'file_name' => 'opsi-a.png',
+            'chunk_b64' => base64_encode($pngBytes),
+        ]);
+        $optImgRes->assertStatus(201);
+        $optRelativeUrl = (string) $optImgRes->json('url');
+        $this->assertStringStartsWith('/formulir-media/', $optRelativeUrl);
+
+        $form = DataForm::create([
+            'code' => 'F-QIMG-TEST',
+            'id_kategori' => $category->id,
+            'judul' => 'Uji Gambar Pertanyaan',
+            'deskripsi' => 'Verifikasi gambar pertanyaan dan fallback upload',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $form->syncFields([
+            ['id' => 'pil', 'label' => 'Pilih Diagram', 'type' => 'radio', 'required' => true, 'options' => ['Opsi A', 'Opsi B']],
+        ]);
+
+        // Save updated form config with question image, option image, and empty restrict_file_types normalization
+        $fieldsPayload = [
+            [
+                'id' => 'pil',
+                'label' => 'Pilih Diagram',
+                'type' => 'radio',
+                'required' => true,
+                'options' => ['Opsi A', 'Opsi B'],
+                'config' => [
+                    'image_url' => $relativeUrl,
+                    'image_caption' => 'Diagram Alur Sistem',
+                    'image_align' => 'center',
+                    'option_images' => ['Opsi A' => $optRelativeUrl],
+                ],
+            ],
+            [
+                'id' => 'q_qnexd',
+                'label' => 'Unggah Sertifikat',
+                'type' => 'file',
+                'required' => true,
+                'config' => [
+                    'restrict_file_types' => true,
+                    'file_types' => [],
+                    'file_max_count' => 1,
+                    'file_max_mb' => 0,
+                ],
+            ],
+        ];
+
+        $this->actingAs($wali)->put(route('panel.formulir.update', $form->code), [
+            'title' => 'Uji Gambar Pertanyaan',
+            'description' => 'Diperbarui',
+            'category_id' => $category->id,
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'deadline' => now()->addDays(5)->format('Y-m-d\TH:i'),
+            'status_aktif' => '1',
+            'after_save' => 'edit',
+            'fields_json' => json_encode($fieldsPayload, JSON_THROW_ON_ERROR),
+            'settings_json' => json_encode(DataForm::defaultSettings(), JSON_THROW_ON_ERROR),
+        ])->assertRedirect(route('panel.formulir.edit', $form->code));
+
+        $form->refresh();
+        $form->load('kolomFormulir');
+        $pilCol = $form->kolomFormulir->firstWhere('kode_kolom', 'pil');
+        $fileCol = $form->kolomFormulir->firstWhere('kode_kolom', 'q_qnexd');
+
+        $this->assertSame($relativeUrl, $pilCol->konfigurasi['image_url'] ?? null);
+        $this->assertSame('Diagram Alur Sistem', $pilCol->konfigurasi['image_caption'] ?? null);
+        $this->assertSame($optRelativeUrl, $pilCol->konfigurasi['option_images']['Opsi A'] ?? null);
+        $this->assertFalse((bool) ($fileCol->konfigurasi['restrict_file_types'] ?? false));
+
+        // Respondent page renders embedded question image, caption, and option image
+        $this->actingAs($mhs)->get(route('formulir.show', $form->code))
+            ->assertStatus(200)
+            ->assertSee($relativeUrl, false)
+            ->assertSee('Diagram Alur Sistem', false)
+            ->assertSee($optRelativeUrl, false);
+
+        // Stale field_id returns HTTP 422 with reload_required flag
+        $this->actingAs($mhs)->postJson(route('panel.isi.upload-chunk', $form->code), [
+            'field_id' => 'kolom_lama',
+            'upload_id' => 'stale_1',
+            'chunk_index' => 0,
+            'total_chunks' => 1,
+            'file_name' => 'bukti.png',
+            'chunk_b64' => base64_encode($pngBytes),
+        ])->assertStatus(422)->assertJsonPath('reload_required', true);
+
+        // Empty body field_id falls back cleanly to X-Field-Id header
+        $this->actingAs($mhs)
+            ->withHeaders(['X-Field-Id' => 'q_qnexd'])
+            ->postJson(route('panel.isi.upload-chunk', $form->code), [
+                'field_id' => '',
+                'upload_id' => 'hdr_fallback_1',
+                'chunk_index' => 0,
+                'total_chunks' => 1,
+                'file_name' => 'sertifikat.png',
+                'chunk_b64' => base64_encode($pngBytes),
+            ])->assertStatus(201)->assertJsonPath('completed', true);
+
+        // Windows ServeCommand passthrough preserves TEMP/TMP for php artisan serve uploads
+        $this->assertContains('TEMP', \Illuminate\Foundation\Console\ServeCommand::$passthroughVariables);
+        $this->assertContains('TMP', \Illuminate\Foundation\Console\ServeCommand::$passthroughVariables);
+    }
 }

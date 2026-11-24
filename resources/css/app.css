@@ -80,6 +80,41 @@
 }
 
 @layer base {
+    html {
+        scroll-padding-top: 5.5rem;
+    }
+
+    :root {
+        /* Layer 1: Primitive Studio Tokens */
+        --wd-navy-950: #09122c;
+        --wd-navy-900: #0f1c44;
+        --wd-navy-800: #182654;
+        --wd-cerulean-600: #0069a8;
+        --wd-cerulean-700: #005187;
+        --wd-cyan-400: #38bdf8;
+        --wd-cyan-500: #00a6f4;
+        --wd-emerald-700: #047857;
+        --wd-amber-800: #92400e;
+        --wd-crimson-700: #b91c1c;
+
+        /* Layer 2: Semantic Studio Tokens */
+        --wd-canvas: #f3f6fa;
+        --wd-surface: #ffffff;
+        --wd-surface-muted: #f8fafc;
+        --wd-ink: #0f172a;
+        --wd-ink-muted: #475569;
+        --wd-border: rgba(15, 23, 42, 0.09);
+        --wd-border-strong: rgba(15, 23, 42, 0.16);
+        --wd-motion-fast: 160ms;
+        --wd-motion-base: 260ms;
+        --wd-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+        /* Layer 3: Component Studio Tokens */
+        --wd-radius-card: 1.25rem;
+        --wd-radius-stage: 1.5rem;
+        --wd-header-height: 4.5rem;
+    }
+
     body {
         font-family: var(--font-sans);
         background-color: var(--color-surface);
@@ -193,6 +228,213 @@
 
     .sd-chip-scroll::-webkit-scrollbar {
         display: none;
+    }
+
+    /* Wali Data Architectural Studio Surfaces */
+    .wd-studio-bg {
+        background-color: var(--wd-canvas);
+        background-image: radial-gradient(rgba(24, 38, 84, 0.065) 1px, transparent 1px);
+        background-size: 22px 22px;
+    }
+
+    .wd-stage-frame {
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--wd-radius-stage);
+        background: linear-gradient(135deg, #09122c 0%, #101f4a 52%, #182654 100%);
+        color: #ffffff;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+
+    .wd-glass-dark {
+        background-color: rgba(11, 21, 54, 0.78);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: #ffffff;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
+
+    .wd-bento {
+        border-radius: var(--wd-radius-card);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background-color: var(--wd-surface);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+        transition: border-color var(--wd-motion-fast) var(--wd-ease), box-shadow var(--wd-motion-base) var(--wd-ease);
+    }
+
+    .wd-bento-interactive {
+        border-radius: var(--wd-radius-card);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background-color: var(--wd-surface);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+        transition: border-color var(--wd-motion-fast) var(--wd-ease), box-shadow var(--wd-motion-base) var(--wd-ease);
+    }
+
+    .wd-bento-interactive:hover {
+        border-color: rgba(0, 105, 168, 0.45);
+        box-shadow: 0 10px 28px -14px rgba(0, 105, 168, 0.22);
+    }
+
+    .wd-hairline-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .wd-hairline-table thead th {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background-color: var(--wd-surface-muted);
+    }
+
+    .wd-hairline-table tbody td {
+        border-top: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    /* Full-Page UNUSA Google Forms Studio */
+    .gf-studio-canvas {
+        --gf-primary: #0069a8;
+        --gf-dark: #182654;
+        --gf-accent: #00a6f4;
+        --gf-soft: #f0f9ff;
+        --gf-canvas: #f3f6fa;
+        background-color: var(--gf-canvas);
+        background-image: radial-gradient(rgba(24, 38, 84, 0.055) 1px, transparent 1px);
+        background-size: 22px 22px;
+    }
+
+    .gf-studio-canvas[data-gf-palette='benhur'] {
+        --gf-primary: #182654;
+        --gf-dark: #09122c;
+        --gf-accent: #38bdf8;
+        --gf-soft: #eff6ff;
+    }
+
+    .gf-studio-canvas[data-gf-palette='cyan'] {
+        --gf-primary: #0284c7;
+        --gf-dark: #0c4a6e;
+        --gf-accent: #00a6f4;
+        --gf-soft: #e0f2fe;
+    }
+
+    .gf-studio-canvas[data-gf-palette='emerald'] {
+        --gf-primary: #047857;
+        --gf-dark: #064e3b;
+        --gf-accent: #10b981;
+        --gf-soft: #ecfdf5;
+    }
+
+    .gf-studio-canvas[data-gf-palette='slate'] {
+        --gf-primary: #334155;
+        --gf-dark: #0f172a;
+        --gf-accent: #0069a8;
+        --gf-soft: #f1f5f9;
+    }
+
+    .gf-studio-canvas[data-gf-bg='tint'] {
+        --gf-canvas: #eaf3fb;
+    }
+
+    .gf-studio-canvas[data-gf-bg='paper'] {
+        --gf-canvas: #f8fafc;
+    }
+
+    .gf-studio-canvas[data-gf-bg='slate'] {
+        --gf-canvas: #eef2f7;
+    }
+
+    .gf-card {
+        position: relative;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background-color: #ffffff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+        transition: border-color 160ms var(--wd-ease), box-shadow 200ms var(--wd-ease);
+    }
+
+    .sd-wb-surface {
+        border-radius: 1.25rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background-color: #ffffff;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    .sd-wb-block {
+        position: relative;
+        border-radius: 0.95rem;
+        border: 1px solid transparent;
+        background-color: #ffffff;
+        transition: border-color 160ms var(--wd-ease), background-color 160ms var(--wd-ease), box-shadow 180ms var(--wd-ease);
+    }
+
+    .sd-wb-block:hover {
+        border-color: rgba(15, 23, 42, 0.1);
+        background-color: #f8fafc;
+    }
+
+    .sd-wb-block-active {
+        border-color: color-mix(in srgb, var(--gf-primary) 48%, transparent) !important;
+        background-color: color-mix(in srgb, var(--gf-soft) 55%, #ffffff) !important;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--gf-primary) 13%, transparent);
+    }
+
+    .sd-choice-tile {
+        border-radius: 0.875rem;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        background-color: #ffffff;
+        transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .sd-choice-tile:hover {
+        border-color: color-mix(in srgb, var(--gf-primary) 55%, transparent);
+        background-color: #f8fafc;
+    }
+
+    .gf-drag-over {
+        border-color: var(--gf-accent) !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--gf-accent) 45%, transparent);
+    }
+
+    .gf-banner-cerulean-grid {
+        background-color: #0f2557;
+        background-image:
+            radial-gradient(circle at 85% 20%, rgba(0, 166, 244, 0.38), transparent 48%),
+            linear-gradient(135deg, #182654 0%, #0069a8 70%, #0284c7 100%),
+            linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+        background-size: auto, auto, 24px 24px, 24px 24px;
+    }
+
+    .gf-banner-benhur-arch {
+        background: radial-gradient(circle at 15% 80%, rgba(56, 189, 248, 0.26), transparent 45%),
+            radial-gradient(circle at 88% 25%, rgba(0, 105, 168, 0.55), transparent 50%),
+            linear-gradient(125deg, #09122c 0%, #182654 55%, #1e3575 100%);
+    }
+
+    .gf-banner-cyan-wave {
+        background: radial-gradient(circle at 80% 75%, rgba(125, 211, 252, 0.35), transparent 50%),
+            linear-gradient(135deg, #0c4a6e 0%, #0284c7 55%, #00a6f4 100%);
+    }
+
+    .gf-banner-emerald-mutu {
+        background: radial-gradient(circle at 82% 24%, rgba(52, 211, 153, 0.28), transparent 48%),
+            linear-gradient(135deg, #064e3b 0%, #047857 60%, #0f766e 100%);
+    }
+
+    .gf-banner-slate-formal {
+        background: radial-gradient(circle at 90% 20%, rgba(56, 189, 248, 0.16), transparent 45%),
+            linear-gradient(135deg, #0f172a 0%, #1e293b 65%, #334155 100%);
+    }
+
+    .gf-banner-minimal {
+        background: linear-gradient(90deg, var(--gf-dark) 0%, var(--gf-primary) 65%, var(--gf-accent) 100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wd-bento,
+    .wd-bento-interactive {
+        transition: none;
     }
 }
 

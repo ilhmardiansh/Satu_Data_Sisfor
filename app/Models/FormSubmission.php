@@ -162,12 +162,16 @@ class FormSubmission extends Model
         $existing = $this->dataIsian()->get()->keyBy('id_kolom');
         $firstEvidencePath = null;
 
-        foreach ($form->kolomFormulir as $col) {
+        $inputCols = $form->kolomFormulir->filter(
+            fn (FormField $col): bool => $col->isInputField()
+        );
+
+        foreach ($inputCols as $col) {
             $kode = $col->kode_kolom;
             $val = array_key_exists($kode, $values) ? (string) ($values[$kode] ?? '') : '';
             $existingRow = $existing->get($col->id);
             $path = $attachments !== null
-                ? ($attachments[$kode] ?? $existingRow?->jalur_berkas)
+                ? (array_key_exists($kode, $attachments) ? ($attachments[$kode] ?: null) : $existingRow?->jalur_berkas)
                 : $existingRow?->jalur_berkas;
 
             if ($firstEvidencePath === null && is_string($path) && $path !== '') {
@@ -197,7 +201,9 @@ class FormSubmission extends Model
             );
         }
 
-        if ($firstEvidencePath !== null && $this->jalur_berkas_bukti !== $firstEvidencePath) {
+        if ($attachments !== null && $this->jalur_berkas_bukti !== $firstEvidencePath) {
+            $this->forceFill(['jalur_berkas_bukti' => $firstEvidencePath])->save();
+        } elseif ($firstEvidencePath !== null && $this->jalur_berkas_bukti !== $firstEvidencePath) {
             $this->forceFill(['jalur_berkas_bukti' => $firstEvidencePath])->save();
         }
 

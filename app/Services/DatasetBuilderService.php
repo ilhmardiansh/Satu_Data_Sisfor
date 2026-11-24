@@ -211,11 +211,11 @@ class DatasetBuilderService
 
             $numericFields = array_values(array_filter(
                 $fields,
-                fn (array $fl): bool => ($fl['type'] ?? '') === 'number'
+                fn (array $fl): bool => in_array($fl['type'] ?? '', ['number', 'linear_scale', 'rating'], true)
             ));
             $groupableFields = array_values(array_filter(
                 $fields,
-                fn (array $fl): bool => in_array($fl['type'] ?? '', ['select', 'radio', 'checkbox', 'text'], true)
+                fn (array $fl): bool => in_array($fl['type'] ?? '', ['select', 'radio', 'checkbox', 'text', 'linear_scale', 'rating'], true)
             ));
 
             return [
@@ -232,7 +232,7 @@ class DatasetBuilderService
                 'totalCount' => $totalSubsCount,
                 'rawCount' => $rawSubsCount,
                 'validCount' => $validSubs->count(),
-                'preprocessUrl' => route('panel.preprocessing', ['form' => $form->code]),
+                'preprocessUrl' => route('panel.preprocessing.show', $form->code),
                 'fields' => $fields,
                 'numericFields' => $numericFields,
                 'groupableFields' => $groupableFields,

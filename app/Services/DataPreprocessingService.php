@@ -44,6 +44,12 @@ class DataPreprocessingService
             }
         }
 
+        $formItems = $form->items ?? [];
+        $activeFieldsBySub = [];
+        foreach ($activeSubs as $sub) {
+            $activeFieldsBySub[$sub->id] = $this->quality->resolveActiveFieldIds($formItems, $sub->values ?? []);
+        }
+
         $columns = [];
         foreach ($form->fields ?? [] as $field) {
             $fid = (string) ($field['id'] ?? '');
@@ -56,14 +62,18 @@ class DataPreprocessingService
             foreach ($activeSubs as $sub) {
                 $val = (string) ($sub->values[$fid] ?? '');
                 $trimmed = trim($val);
+                $isActiveForSub = isset($activeFieldsBySub[$sub->id][$fid]);
+
                 if ($trimmed === '') {
-                    $missing++;
+                    if ($isActiveForSub) {
+                        $missing++;
+                    }
                 } else {
                     $filled++;
                     $distinct[mb_strtolower($trimmed)] = true;
                 }
 
-                if ($this->quality->fieldError($field, $val) !== null) {
+                if (($isActiveForSub || $trimmed !== '') && $this->quality->fieldError($field, $val) !== null) {
                     $invalid++;
                 }
 
@@ -110,7 +120,9 @@ class DataPreprocessingService
     public function normalizeForm(DataForm $form, int $actorId, array $opts = []): array
     {
         $form->loadMissing('kolomFormulir');
-        $fieldsById = $form->kolomFormulir->keyBy('id');
+        $fieldsById = $form->kolomFormulir
+            ->filter(fn (FormField $col): bool => $col->isInputField())
+            ->keyBy('id');
         $activeSubs = $form->submissions()
             ->with(['dataIsian.kolomFormulir'])
             ->where('status_validasi', '!=', 'ditolak')
