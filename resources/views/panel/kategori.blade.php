@@ -10,12 +10,11 @@
 
 <div x-data="categoryManager()">
     <x-panel-head
-        eyebrow="REFERENSI · TAKSONOMI DATA"
         scene="kategori"
         badge="{{ $categories->count() }} Kategori"
         badgeTone="sky"
         title="Kategori Data"
-        desc="Kategori untuk mengelompokkan formulir, data, dan dataset. Kategori baru dapat ditambahkan tanpa mengubah kode program."
+        desc="Kelompokkan formulir dan dataset ke dalam kategori data prodi."
     >
         <button type="button"
                 @click="openNew()"
@@ -72,11 +71,11 @@
                             $catSearchKey = strtolower($c->code.' '.$c->name.' '.($c->description ?? ''));
                         @endphp
                         <tr x-show="matchesSearch(@js($catSearchKey))" class="transition-colors hover:bg-[#F8FAFC]">
-                            <td class="px-4 py-3 font-mono text-xs font-bold text-[#0069A8]">{{ $c->code }}</td>
+                            <td class="px-4 py-3 text-xs font-bold tabular-nums text-[#0069A8]">{{ $c->code }}</td>
                             <td class="px-4 py-3 text-sm font-bold text-slate-900">{{ $c->name }}</td>
                             <td class="px-4 py-3 text-sm text-[#475569]">{{ $c->description }}</td>
-                            <td class="px-4 py-3 font-mono text-sm text-slate-700">{{ $c->data_forms_count }}</td>
-                            <td class="px-4 py-3 font-mono text-sm text-slate-700">{{ $c->datasets_count }}</td>
+                            <td class="px-4 py-3 text-sm tabular-nums text-slate-700">{{ $c->data_forms_count }}</td>
+                            <td class="px-4 py-3 text-sm tabular-nums text-slate-700">{{ $c->datasets_count }}</td>
                             <td class="px-4 py-3 text-sm text-slate-600">
                                 <div class="flex justify-end gap-1.5">
                                     <button
@@ -132,7 +131,7 @@
             <article x-show="matchesSearch(@js($catSearchKey))" class="wd-bento-interactive flex flex-col justify-between p-5">
                 <div>
                     <div class="flex items-start justify-between gap-2">
-                        <span class="rounded-md bg-[#F0F9FF] px-2 py-0.5 font-mono text-[11px] font-bold text-[#0069A8]">{{ $c->code }}</span>
+                        <span class="rounded-md bg-[#F0F9FF] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[#0069A8]">{{ $c->code }}</span>
                         <div class="flex gap-1">
                             <button type="button"
                                     @click="openEdit({ id: {{ $c->id }}, code: @js($c->code), name: @js($c->name), description: @js($c->description ?? ''), action: @js(route('panel.kategori.update', $c->id)) })"
@@ -159,7 +158,7 @@
                 <div class="mt-4 border-t border-slate-100 pt-3">
                     <div class="flex items-center justify-between text-xs">
                         <span class="font-semibold text-slate-700">{{ $c->data_forms_count }} Formulir · {{ $c->datasets_count }} Dataset</span>
-                        <span class="font-mono font-bold text-[#0069A8]">{{ $used }}</span>
+                        <span class="font-bold tabular-nums text-[#0069A8]">{{ $used }}</span>
                     </div>
                     <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
                         <div class="h-full rounded-full {{ $used > 0 ? 'bg-[#0069A8]' : 'bg-slate-200' }}" style="width: {{ $pct }}%"></div>
@@ -175,7 +174,7 @@
             <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
-                        <p class="font-mono text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Kategori data</p>
+                        <p class="text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Kategori data</p>
                         <h2 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl" x-text="isEdit ? 'Ubah kategori' : 'Tambah kategori'"></h2>
                     </div>
                     <button type="button" @click="modalOpen = false" aria-label="Tutup" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-[#0069A8] hover:text-[#0069A8]">

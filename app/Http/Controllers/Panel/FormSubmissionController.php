@@ -54,7 +54,7 @@ class FormSubmissionController extends Controller
         if (! $user) {
             $closedReason = 'Masuk terlebih dahulu dengan akun Produsen Data atau Admin untuk mengisi formulir ini.';
         } elseif (! ($user->isProdusen() || $user->isAdmin())) {
-            $closedReason = 'Wali Data tidak mengisi instrumen secara langsung. Gunakan menu Pre-processing Data untuk meninjau respons.';
+            $closedReason = 'Wali Data tidak diperkenankan mengisi data.';
         } elseif (! $dataForm->canBeSeenBy($user)) {
             $closedReason = "Formulir ini khusus ditujukan untuk responden kategori {$dataForm->target}.";
         } elseif (! $dataForm->isOpen()) {
@@ -112,7 +112,9 @@ class FormSubmissionController extends Controller
         $settings = $dataForm->settings;
 
         if (! $user || (! $user->isProdusen() && ! $user->isAdmin())) {
-            $msg = 'Hanya Produsen Data atau Admin yang dapat mengisi formulir.';
+            $msg = $user && $user->isWali()
+                ? 'Wali Data tidak diperkenankan mengisi data.'
+                : 'Hanya Produsen Data atau Admin yang dapat mengisi formulir.';
 
             return $request->expectsJson()
                 ? response()->json(['message' => $msg], 403)

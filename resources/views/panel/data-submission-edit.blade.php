@@ -36,8 +36,8 @@
                             <i data-lucide="arrow-left" class="h-3.5 w-3.5" aria-hidden="true"></i>
                             Kembali ke Pre-processing
                         </a>
-                        <span class="rounded-md bg-white/15 px-2.5 py-1 font-mono font-bold text-[#74D4FF]">{{ $submission->code }}</span>
-                        <span class="rounded-md bg-white/10 px-2.5 py-1 font-mono text-slate-200">{{ $form->code }}</span>
+                        <span class="rounded-md bg-white/15 px-2.5 py-1 font-bold tabular-nums text-[#74D4FF]">{{ $submission->code }}</span>
+                        <span class="rounded-md bg-white/10 px-2.5 py-1 tabular-nums text-slate-200">{{ $form->code }}</span>
                         <span class="rounded-md px-2.5 py-1 font-bold {{ $submission->status_validasi === 'valid' ? 'bg-emerald-400/20 text-emerald-200' : ($submission->status_validasi === 'ditolak' ? 'bg-slate-400/20 text-slate-200' : 'bg-amber-400/20 text-amber-200') }}">
                             {{ $submission->validationLabel() }}
                         </span>
@@ -58,7 +58,7 @@
         <aside class="space-y-4">
             <!-- Quality Findings -->
             <section class="wd-bento p-5">
-                <p class="font-mono text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Inspeksi Kualitas</p>
+                <p class="text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Inspeksi Kualitas</p>
                 <h2 class="mt-1 text-sm font-extrabold text-slate-900">Status Baris Saat Ini</h2>
                 @if(! empty($issues))
                     <ul class="mt-3 space-y-2 text-xs font-medium text-[#B91C1C]">
@@ -80,7 +80,7 @@
             <!-- Current Proof Attachments Inspector -->
             @if(! empty($attachmentMeta))
                 <section class="wd-bento p-5">
-                    <p class="font-mono text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Berkas Lampiran</p>
+                    <p class="text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Berkas Lampiran</p>
                     <h2 class="mt-1 text-sm font-extrabold text-slate-900">Bukti Pendukung Tersimpan</h2>
                     <div class="mt-3 space-y-3">
                         @foreach($fields as $fld)
@@ -90,7 +90,7 @@
                                     <p class="font-bold text-slate-900">{{ $fld['label'] }}</p>
                                     @if($meta && $meta['valid_file'])
                                         <p class="mt-1 truncate font-medium text-[#0069A8]" title="{{ $meta['name'] }}">{{ $meta['name'] }}</p>
-                                        <p class="mt-0.5 font-mono text-[11px] text-[#475569]">{{ $formatSize($meta['size']) }}</p>
+                                        <p class="mt-0.5 text-[11px] tabular-nums text-[#475569]">{{ $formatSize($meta['size']) }}</p>
                                         <div class="mt-2.5 flex flex-wrap gap-1.5">
                                             @if($meta['preview_url'])
                                                 <a href="{{ $meta['preview_url'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">
@@ -119,8 +119,8 @@
 
             <!-- Audit Note -->
             <section class="wd-bento p-5 text-xs leading-relaxed text-[#475569]">
-                <p class="font-mono text-[10px] font-bold tracking-wider text-[#182654] uppercase">Jejak Audit</p>
-                <p class="mt-1.5">Perbaikan ini memperbarui nilai bersih (<code>nilai</code>) dan lampiran bukti (<code>jalur_berkas</code>), sedangkan nilai asli dari pengisi tetap tersimpan aman di kolom <code>nilai_mentah</code>.</p>
+                <p class="text-[10px] font-bold tracking-wider text-[#182654] uppercase">Riwayat Perubahan</p>
+                <p class="mt-1.5">Perbaikan ini memperbarui nilai tervalidasi dan lampiran bukti, sementara data asli pengisian tetap tersimpan.</p>
             </section>
         </aside>
 
@@ -184,7 +184,7 @@
                                         <span class="ml-0.5 text-[#B91C1C]">*</span>
                                     @endif
                                 </label>
-                                <span class="rounded bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#475569]">{{ $type }}</span>
+                                <span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-[#475569]">{{ $type }}</span>
                             </div>
 
                             @if($type === 'select' || $type === 'radio')
@@ -394,7 +394,7 @@
                                     <div x-show="uploadingFields['{{ $fid }}']" x-cloak class="space-y-1">
                                         <div class="flex items-center justify-between text-[11px] font-bold text-[#0069A8]">
                                             <span>Mengunggah berkas bukti secara bertahap...</span>
-                                            <span class="font-mono" x-text="`${uploadProgress['{{ $fid }}'] || 0}%`"></span>
+                                            <span class="tabular-nums" x-text="`${uploadProgress['{{ $fid }}'] || 0}%`"></span>
                                         </div>
                                         <div class="h-1.5 overflow-hidden rounded-full bg-slate-200">
                                             <div class="h-full rounded-full bg-[#0069A8] transition-all" :style="`width: ${uploadProgress['{{ $fid }}'] || 0}%`"></div>

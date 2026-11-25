@@ -51,13 +51,20 @@ class DataPreprocessingService
         }
 
         $columns = [];
+        $missingCells = 0;
+        $invalidCells = 0;
+        $nonUniformCells = 0;
+        $outlierCells = 0;
+
         foreach ($form->fields ?? [] as $field) {
             $fid = (string) ($field['id'] ?? '');
+            $type = (string) ($field['type'] ?? 'text');
             $filled = 0;
             $missing = 0;
             $invalid = 0;
             $nonUniform = 0;
             $distinct = [];
+            $numericSamples = [];
 
             foreach ($activeSubs as $sub) {
                 $val = (string) ($sub->values[$fid] ?? '');
@@ -73,8 +80,14 @@ class DataPreprocessingService
                     $distinct[mb_strtolower($trimmed)] = true;
                 }
 
-                if (($isActiveForSub || $trimmed !== '') && $this->quality->fieldError($field, $val) !== null) {
+                $fieldErr = ($isActiveForSub || $trimmed !== '') ? $this->quality->fieldError($field, $val) : null;
+                if ($fieldErr !== null) {
                     $invalid++;
+                } elseif (in_array($type, ['number', 'linear_scale', 'rating'], true) && $trimmed !== '') {
+                    $parsedNum = ChartPaletteService::parseNumeric($trimmed);
+                    if ($parsedNum !== null) {
+                        $numericSamples[] = ['sub_code' => $sub->code, 'value' => $parsedNum];
+                    }
                 }
 
                 if ($val !== '' && $this->quality->normalizeValue($field, $val) !== $val) {
@@ -83,20 +96,44 @@ class DataPreprocessingService
             }
 
             $completeness = $activeCount > 0 ? round(($filled / $activeCount) * 100, 1) : 100.0;
+            $uniqueCount = count($distinct);
+            $numericStats = $this->computeNumericStats($numericSamples);
+
+            $missingCells += $missing;
+            $invalidCells += $invalid;
+            $nonUniformCells += $nonUniform;
+            $outlierCells += $numericStats['outlier_count'];
 
             $columns[] = [
                 'id' => $fid,
                 'label' => (string) ($field['label'] ?? $fid),
-                'type' => (string) ($field['type'] ?? 'text'),
+                'type' => $type,
                 'required' => (bool) ($field['required'] ?? false),
                 'filled' => $filled,
                 'missing' => $missing,
                 'completeness_pct' => $completeness,
                 'invalid' => $invalid,
                 'non_uniform' => $nonUniform,
-                'unique_count' => count($distinct),
+                'unique_count' => $uniqueCount,
+                'numeric_stats' => $numericStats,
+                'viz_suitability' => $this->classifyVisualizationSuitability($type, $activeCount, $uniqueCount, $filled, $invalid),
             ];
         }
+
+        $completenessAvg = ! empty($columns)
+            ? round((float) collect($columns)->avg('completeness_pct'), 1)
+            : 100.0;
+
+        $standardStages = $this->buildStandardStages(
+            $form,
+            $activeCount,
+            $valid,
+            $issueRows,
+            $duplicateRows,
+            $missingCells,
+            $invalidCells,
+            $nonUniformCells
+        );
 
         return [
             'total' => $total,
@@ -107,7 +144,226 @@ class DataPreprocessingService
             'issue_rows' => $issueRows,
             'duplicate_rows' => $duplicateRows,
             'clean_active_rows' => max(0, $activeCount - $issueRows),
+            'missing_cells' => $missingCells,
+            'invalid_cells' => $invalidCells,
+            'non_uniform_cells' => $nonUniformCells,
+            'outlier_cells' => $outlierCells,
+            'completeness_avg' => $completenessAvg,
+            'standard_stages' => $standardStages,
             'columns' => $columns,
+        ];
+    }
+
+    /**
+     * Execute safe automated steps of the Satu Data standard pipeline (Normalization -> Deduplication).
+     *
+     * @return array{
+     *     changed_cells: int,
+     *     changed_rows: int,
+     *     dedup_handled: int,
+     *     remaining_issues: int,
+     *     active_count: int
+     * }
+     */
+    public function runStandardPipeline(
+        DataForm $form,
+        int $actorId,
+        string $textCase = 'none',
+        string $scope = 'same_values'
+    ): array {
+        $normRes = $this->normalizeForm($form, $actorId, [
+            'normalize_numbers' => true,
+            'text_case' => $textCase,
+        ]);
+
+        $dedupRes = $this->deduplicateForm($form, $actorId, $scope, 'reject');
+
+        $form->loadMissing('kolomFormulir');
+        $allSubs = $form->submissions()
+            ->with(['user', 'dataIsian.kolomFormulir'])
+            ->get();
+        $issuesMap = $this->quality->inspectSubmissions($form, $allSubs);
+        $activeSubs = $allSubs->where('status_validasi', '!=', 'ditolak')->values();
+        $remainingIssues = $activeSubs->filter(fn (FormSubmission $s): bool => ! empty($issuesMap[$s->id]))->count();
+
+        return [
+            'changed_cells' => $normRes['changed_cells'],
+            'changed_rows' => $normRes['changed_rows'],
+            'dedup_handled' => $dedupRes['handled'],
+            'remaining_issues' => $remainingIssues,
+            'active_count' => $activeSubs->count(),
+        ];
+    }
+
+    /**
+     * Compute numeric distribution metrics and IQR-based outlier count for anomaly inspection.
+     *
+     * @param  array<int, array{sub_code: string, value: float}>  $samples
+     * @return array{
+     *     count: int,
+     *     min: float|null,
+     *     median: float|null,
+     *     max: float|null,
+     *     outlier_count: int,
+     *     outlier_codes: array<int, string>
+     * }
+     */
+    protected function computeNumericStats(array $samples): array
+    {
+        $count = count($samples);
+        if ($count === 0) {
+            return [
+                'count' => 0,
+                'min' => null,
+                'median' => null,
+                'max' => null,
+                'outlier_count' => 0,
+                'outlier_codes' => [],
+            ];
+        }
+
+        $vals = array_map(fn (array $s): float => $s['value'], $samples);
+        sort($vals);
+
+        $mid = intdiv($count, 2);
+        $median = $count % 2 === 1
+            ? $vals[$mid]
+            : round(($vals[$mid - 1] + $vals[$mid]) / 2, 2);
+
+        $outlierCodes = [];
+        if ($count >= 4) {
+            $q1 = $this->percentile($vals, 0.25);
+            $q3 = $this->percentile($vals, 0.75);
+            $iqr = $q3 - $q1;
+            if ($iqr > 0) {
+                $low = $q1 - 1.5 * $iqr;
+                $high = $q3 + 1.5 * $iqr;
+                foreach ($samples as $sample) {
+                    if ($sample['value'] < $low || $sample['value'] > $high) {
+                        $outlierCodes[] = $sample['sub_code'];
+                    }
+                }
+            }
+        }
+
+        return [
+            'count' => $count,
+            'min' => $vals[0],
+            'median' => $median,
+            'max' => $vals[$count - 1],
+            'outlier_count' => count($outlierCodes),
+            'outlier_codes' => array_slice($outlierCodes, 0, 5),
+        ];
+    }
+
+    /**
+     * Linear-interpolated percentile over a sorted float array.
+     *
+     * @param  array<int, float>  $sorted
+     */
+    protected function percentile(array $sorted, float $p): float
+    {
+        $n = count($sorted);
+        if ($n === 0) {
+            return 0.0;
+        }
+        $pos = ($n - 1) * $p;
+        $lo = (int) floor($pos);
+        $hi = (int) ceil($pos);
+        if ($lo === $hi) {
+            return $sorted[$lo];
+        }
+
+        return $sorted[$lo] + ($sorted[$hi] - $sorted[$lo]) * ($pos - $lo);
+    }
+
+    protected function classifyVisualizationSuitability(
+        string $type,
+        int $activeCount,
+        int $uniqueCount,
+        int $filled,
+        int $invalid
+    ): string {
+        if ($activeCount === 0 || $filled === 0) {
+            return 'empty';
+        }
+        if (in_array($type, ['number', 'linear_scale', 'rating'], true)) {
+            return $invalid === 0 ? 'metric_ideal' : 'needs_fix';
+        }
+        if (in_array($type, ['radio', 'select', 'checkbox'], true) && $uniqueCount >= 2 && $uniqueCount <= 12) {
+            return 'group_ideal';
+        }
+        if ($type === 'text' && $uniqueCount >= 2 && $uniqueCount <= 12) {
+            return 'group_ideal';
+        }
+        if ($activeCount >= 3 && $uniqueCount <= 1) {
+            return 'low_variance';
+        }
+
+        return 'detail_only';
+    }
+
+    /**
+     * Build the canonical 5-stage Satu Data processing compliance checklist.
+     *
+     * @return array<int, array{step: int, key: string, title: string, desc: string, done: bool, status_label: string}>
+     */
+    protected function buildStandardStages(
+        DataForm $form,
+        int $activeCount,
+        int $validCount,
+        int $issueRows,
+        int $duplicateRows,
+        int $missingCells,
+        int $invalidCells,
+        int $nonUniformCells
+    ): array {
+        $normDone = $activeCount > 0 && $nonUniformCells === 0 && $invalidCells === 0;
+        $dedupDone = $activeCount > 0 && $duplicateRows === 0;
+        $missingDone = $activeCount > 0 && $missingCells === 0 && $invalidCells === 0;
+        $finalDone = $form->isPreprocessed() && $issueRows === 0 && $validCount > 0;
+
+        return [
+            [
+                'step' => 1,
+                'key' => 'lock',
+                'title' => 'Tutup & Kunci Sumber',
+                'desc' => 'Instrumen ditutup agar snapshot respons stabil selama pembersihan.',
+                'done' => $form->isClosed(),
+                'status_label' => $form->isClosed() ? 'Terkunci' : 'Terbuka',
+            ],
+            [
+                'step' => 2,
+                'key' => 'normalize',
+                'title' => 'Normalisasi Format',
+                'desc' => 'Seragamkan spasi, kapitalisasi, pilihan, tanggal ISO, dan angka murni.',
+                'done' => $normDone,
+                'status_label' => $normDone ? 'Seragam' : ($activeCount === 0 ? 'Menunggu' : "{$nonUniformCells} sel"),
+            ],
+            [
+                'step' => 3,
+                'key' => 'dedup',
+                'title' => 'Deduplikasi Ganda',
+                'desc' => 'Deteksi dan sisihkan baris identik agar frekuensi grafik tidak membengkak.',
+                'done' => $dedupDone,
+                'status_label' => $dedupDone ? 'Bersih' : ($activeCount === 0 ? 'Menunggu' : "{$duplicateRows} ganda"),
+            ],
+            [
+                'step' => 4,
+                'key' => 'missing',
+                'title' => 'Missing Value & Validasi',
+                'desc' => 'Isi sel kosong (modus/mean/median) atau tolak baris tidak layak.',
+                'done' => $missingDone,
+                'status_label' => $missingDone ? 'Lengkap' : ($activeCount === 0 ? 'Menunggu' : ($missingCells + $invalidCells).' sel'),
+            ],
+            [
+                'step' => 5,
+                'key' => 'finalize',
+                'title' => 'Quality Gate & Valid',
+                'desc' => 'Finalisasi 0 masalah kualitas dan pertahankan jejak audit nilai mentah.',
+                'done' => $finalDone,
+                'status_label' => $finalDone ? 'Siap Visualisasi' : ($issueRows > 0 ? "{$issueRows} bermasalah" : 'Klik Finalisasi'),
+            ],
         ];
     }
 

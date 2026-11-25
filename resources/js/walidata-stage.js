@@ -100,13 +100,13 @@ function createBadgeSprite(code, label, accentCss, disposables) {
         ctx.fill();
 
         ctx.fillStyle = '#09122C';
-        ctx.font = '800 20px monospace';
+        ctx.font = "800 20px 'Plus Jakarta Sans', system-ui, sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(code, 40, 35);
 
         ctx.fillStyle = '#F8FAFC';
-        ctx.font = '700 22px system-ui, -apple-system, sans-serif';
+        ctx.font = "700 22px 'Plus Jakarta Sans', system-ui, sans-serif";
         ctx.textAlign = 'left';
         ctx.fillText(label, 80, 35);
     }, disposables);

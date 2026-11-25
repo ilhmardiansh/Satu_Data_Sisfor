@@ -170,10 +170,10 @@
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2 text-xs">
-                                        <span class="rounded-md bg-[#f0f9ff] px-2 py-0.5 font-mono font-semibold text-[#0069a8]">{{ $v['id'] }}</span>
+                                        <span class="rounded-md bg-[#f0f9ff] px-2 py-0.5 font-semibold tabular-nums text-[#0069a8]">{{ $v['id'] }}</span>
                                         <span class="font-semibold text-[#475569]">{{ $v['kategoriName'] }}</span>
                                         <span class="text-slate-400">·</span>
-                                        <span class="font-mono font-medium text-[#475569]">{{ $v['tahun'] }}</span>
+                                        <span class="font-medium tabular-nums text-[#475569]">{{ $v['tahun'] }}</span>
                                     </div>
                                     <h3 class="mt-2 text-lg font-extrabold tracking-tight text-slate-900">{{ $v['title'] }}</h3>
                                     <p class="mt-1 truncate text-xs font-medium text-[#475569]" title="{{ $v['datasetTitle'] }}">
@@ -255,8 +255,8 @@
             <div class="rounded-3xl border border-slate-200 bg-[#F6F9FC] p-6 sm:p-10">
                 <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200/80 pb-6">
                     <div class="max-w-2xl">
-                        <span class="inline-flex items-center rounded-md bg-[#F0F9FF] px-2.5 py-1 font-mono text-xs font-bold text-[#0069A8]">
-                            {{ $t('ALUR SATU DATA', 'SATU DATA WORKFLOW') }}
+                        <span class="inline-flex items-center rounded-md bg-[#F0F9FF] px-2.5 py-1 text-xs font-bold text-[#0069A8]">
+                            {{ $t('Satu Data Prodi', 'Satu Data Flow') }}
                         </span>
                         <h2 class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900">
                             {{ $t('Belum ada visualisasi dashboard yang diterbitkan', 'No published dashboard visualizations yet') }}
@@ -284,22 +284,22 @@
 
                 <ol class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <li class="rounded-2xl border border-slate-200/80 bg-white p-4">
-                        <p class="font-mono text-xs font-bold text-[#0069A8]">01 · FORMULIR GFORM</p>
+                        <p class="text-xs font-bold text-[#0069A8]">Formulir GForm</p>
                         <p class="mt-1.5 text-sm font-bold text-slate-900">Rancang Instrumen</p>
                         <p class="mt-1 text-xs leading-relaxed text-[#475569]">Wali Data atau Admin menyusun formulir pertanyaan dan sasaran responden.</p>
                     </li>
                     <li class="rounded-2xl border border-slate-200/80 bg-white p-4">
-                        <p class="font-mono text-xs font-bold text-[#0069A8]">02 · PENGUMPULAN</p>
+                        <p class="text-xs font-bold text-[#0069A8]">Pengumpulan</p>
                         <p class="mt-1.5 text-sm font-bold text-slate-900">Isi Formulir / Impor</p>
                         <p class="mt-1 text-xs leading-relaxed text-[#475569]">Produsen Data mengisi tautan GForm atau Wali Data mengimpor respons Excel/CSV.</p>
                     </li>
                     <li class="rounded-2xl border border-slate-200/80 bg-white p-4">
-                        <p class="font-mono text-xs font-bold text-[#92400E]">03 · PRE-PROCESSING</p>
+                        <p class="text-xs font-bold text-[#92400E]">Pre-processing</p>
                         <p class="mt-1.5 text-sm font-bold text-slate-900">Pembersihan &amp; Validasi</p>
                         <p class="mt-1 text-xs leading-relaxed text-[#475569]">Normalisasi format, deduplikasi, penanganan missing value, dan finalisasi status valid.</p>
                     </li>
                     <li class="rounded-2xl border border-slate-200/80 bg-white p-4">
-                        <p class="font-mono text-xs font-bold text-[#047857]">04 · DATASET &amp; GRAFIK</p>
+                        <p class="text-xs font-bold text-[#047857]">Dataset &amp; Grafik</p>
                         <p class="mt-1.5 text-sm font-bold text-slate-900">Publikasi Visualisasi</p>
                         <p class="mt-1 text-xs leading-relaxed text-[#475569]">Dataset bernumerik yang terbit dapat divisualisasikan langsung ke Dashboard ini.</p>
                     </li>
@@ -325,10 +325,10 @@
             <!-- Group A.1 (Kartu terbelah horizontal 2 kolom agar lega dibaca) -->
             <div class="mt-8">
                 <div class="mb-5 flex items-center gap-3 text-sm">
-                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 font-mono text-xs font-bold text-[#0069a8]">A.1</span>
+                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 text-xs font-bold tabular-nums text-[#0069a8]">A.1</span>
                     <h3 class="font-bold text-slate-900">Pendidikan dan mahasiswa</h3>
                     <span class="h-px min-w-4 flex-1 bg-slate-200"></span>
-                    <span class="shrink-0 font-mono text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['akademik1']) }} indikator</span>
+                    <span class="shrink-0 text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['akademik1']) }} indikator</span>
                 </div>
                 <div class="reveal-stagger grid grid-cols-1 gap-6 lg:grid-cols-2">
                     @foreach($metrics['akademik1'] as $idx => $m)
@@ -340,10 +340,10 @@
             <!-- Group A.2 -->
             <div class="mt-10">
                 <div class="mb-5 flex items-center gap-3 text-sm">
-                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 font-mono text-xs font-bold text-[#0069a8]">A.2</span>
+                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 text-xs font-bold tabular-nums text-[#0069a8]">A.2</span>
                     <h3 class="font-bold text-slate-900">Penelitian, prestasi, dan luaran</h3>
                     <span class="h-px min-w-4 flex-1 bg-slate-200"></span>
-                    <span class="shrink-0 font-mono text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['akademik2']) }} indikator</span>
+                    <span class="shrink-0 text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['akademik2']) }} indikator</span>
                 </div>
                 <div class="reveal-stagger grid grid-cols-1 gap-6 lg:grid-cols-2">
                     @foreach($metrics['akademik2'] as $idx => $m)
@@ -368,10 +368,10 @@
             <!-- Group N.1 (3 kolom vertikal) -->
             <div class="mt-8">
                 <div class="mb-5 flex items-center gap-3 text-sm">
-                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 font-mono text-xs font-bold text-[#0069a8]">N.1</span>
+                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 text-xs font-bold tabular-nums text-[#0069a8]">N.1</span>
                     <h3 class="font-bold text-slate-900">Sumber daya manusia</h3>
                     <span class="h-px min-w-4 flex-1 bg-slate-200"></span>
-                    <span class="shrink-0 font-mono text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['nonakademik1']) }} indikator</span>
+                    <span class="shrink-0 text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['nonakademik1']) }} indikator</span>
                 </div>
                 <div class="reveal-stagger grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                     @foreach($metrics['nonakademik1'] as $idx => $m)
@@ -383,10 +383,10 @@
             <!-- Group N.2 (Spotlight penuh horizontal) -->
             <div class="mt-10">
                 <div class="mb-5 flex items-center gap-3 text-sm">
-                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 font-mono text-xs font-bold text-[#0069a8]">N.2</span>
+                    <span class="inline-flex items-center rounded-md bg-[#f0f9ff] px-2.5 py-0.5 text-xs font-bold tabular-nums text-[#0069a8]">N.2</span>
                     <h3 class="font-bold text-slate-900">Tata kelola dan kemitraan</h3>
                     <span class="h-px min-w-4 flex-1 bg-slate-200"></span>
-                    <span class="shrink-0 font-mono text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['nonakademik2']) }} indikator</span>
+                    <span class="shrink-0 text-xs font-semibold tabular-nums text-[#475569]">{{ count($metrics['nonakademik2']) }} indikator</span>
                 </div>
                 <div class="reveal-stagger grid grid-cols-1 gap-6">
                     @foreach($metrics['nonakademik2'] as $idx => $m)
@@ -543,7 +543,7 @@
                                 <span class="h-2.5 w-2.5 shrink-0 rounded-[3px]" style="background: ${color}"></span>
                                 <span class="truncate font-medium text-slate-700">${window.SatuDataCharts.escapeHtml(x.n)}</span>
                             </span>
-                            <span class="shrink-0 font-mono text-xs font-semibold text-slate-900">${x.v.toLocaleString('id-ID')}</span>
+                            <span class="shrink-0 text-xs font-semibold tabular-nums text-slate-900">${x.v.toLocaleString('id-ID')}</span>
                         </div>
                         <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                             <div class="h-full rounded-full" style="width: ${barW}%; background: ${color}"></div>

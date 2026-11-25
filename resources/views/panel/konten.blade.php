@@ -20,6 +20,7 @@
 
 <div x-data="contentManager()">
     <x-panel-head
+        scene="visualisasi"
         title="Konten Beranda & Tentang Kami"
         desc="Perbarui profil program studi, dosen pengampu, prestasi, berita, dan kurikulum tanpa mengubah kode program."
     />
@@ -146,7 +147,7 @@
                         @endif
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="font-mono text-[11px] font-bold text-sky-700">{{ $d->code }}</span>
+                                <span class="text-[11px] font-bold tabular-nums text-sky-700">{{ $d->code }}</span>
                                 <span class="rounded bg-sky-100/80 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">{{ $d->pendidikan }}</span>
                                 <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{{ $d->jabatan }}</span>
                             </div>
@@ -214,7 +215,7 @@
                         @endif
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-mono text-[11px] font-bold text-[#0069A8]">{{ $p->code }}</span>
+                                <span class="text-[11px] font-bold tabular-nums text-[#0069A8]">{{ $p->code }}</span>
                                 <span class="rounded-md px-2 py-0.5 text-[11px] font-bold {{ $tingkatClass($p->tingkat) }}">{{ $p->tingkat }}</span>
                                 <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">{{ $p->peringkat }}</span>
                                 <span class="text-xs text-slate-500">{{ $p->tahun }}</span>
@@ -271,7 +272,7 @@
                         <img src="{{ $b->image_url }}" alt="{{ $b->title }}" class="h-20 w-24 shrink-0 rounded-xl border border-slate-200 object-cover" />
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="font-mono text-[11px] font-bold text-sky-700">{{ $b->code }}</span>
+                                <span class="text-[11px] font-bold tabular-nums text-sky-700">{{ $b->code }}</span>
                                 <span class="rounded bg-sky-100/80 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">{{ $b->badge }}</span>
                                 @if($b->corner)
                                     <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">{{ $b->corner }}</span>
@@ -348,7 +349,7 @@
                     <tbody>
                         @foreach($courses as $c)
                             <tr class="border-t border-slate-200/70 hover:bg-white">
-                                <td class="px-4 py-3 font-mono text-xs font-bold text-sky-700">{{ $c->kode }}</td>
+                                <td class="px-4 py-3 text-xs font-bold tabular-nums text-sky-700">{{ $c->kode }}</td>
                                 <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ $c->nama }}</td>
                                 <td class="px-4 py-3 text-sm text-slate-600">{{ $c->tahun }}</td>
                                 <td class="px-4 py-3 text-sm text-slate-600">Semester {{ $c->semester }}</td>

@@ -61,8 +61,8 @@ class RingkasanController extends Controller
         $rawSubmissionsCount = FormSubmission::query()->where('status_validasi', 'mentah')->count();
         $validSubmissionsCount = FormSubmission::query()->where('status_validasi', 'valid')->count();
         $rejectedSubmissionsCount = FormSubmission::query()->where('status_validasi', 'ditolak')->count();
-        $formsNeedPreprocessingCount = DataForm::query()->where('status_preprocessing', 'proses')->count();
-        $formsReadyCount = DataForm::query()->where('status_preprocessing', 'siap')->count();
+        $formsNeedPreprocessingCount = DataForm::closed()->where('status_preprocessing', 'proses')->count();
+        $formsReadyCount = DataForm::closed()->where('status_preprocessing', 'siap')->count();
         $publicDatasetsCount = Dataset::published()->where('tipe_akses', 'public')->count();
         $publishedDatasetsCount = Dataset::published()->count();
         $draftDatasetsCount = Dataset::query()->where('status_publikasi', 'draft')->count();

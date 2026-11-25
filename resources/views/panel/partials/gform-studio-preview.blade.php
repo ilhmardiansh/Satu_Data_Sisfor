@@ -2,7 +2,7 @@
     <!-- Top Banner Returning to Studio -->
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#182654] px-5 py-3.5 text-white shadow-lg">
         <div>
-            <p class="font-mono text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Pratinjau Portal Responden Satu Data UNUSA</p>
+            <p class="text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Pratinjau Portal Responden Satu Data UNUSA</p>
             <p class="text-sm font-bold">Uji alur multi-bagian, percabangan, rating, dan kisi tanpa menyimpan data.</p>
         </div>
         <button type="button" @click="previewMode = false" class="rounded-xl bg-[#00A6F4] px-4 py-2 text-xs font-extrabold text-[#09122C] hover:bg-[#38BDF8]">
@@ -16,7 +16,7 @@
             <img :src="settings.theme.header_image" alt="Sampul formulir" class="absolute inset-0 h-full w-full object-cover" />
         </template>
         <div :class="`gf-banner-${settings.theme?.header_preset || 'cerulean-grid'}`" class="p-6 sm:p-8" :style="settings.theme?.header_image ? 'background: rgba(9, 18, 44, 0.78);' : ''">
-            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-mono text-[10px] font-bold text-[#74D4FF] uppercase">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold text-[#74D4FF] uppercase">
                 Pratinjau Instrumen · <span x-text="meta.target"></span>
             </span>
             <h2 class="mt-3 text-2xl font-extrabold tracking-tight" x-text="meta.title || 'Judul Instrumen Belum Diisi'"></h2>
@@ -26,7 +26,7 @@
 
     <template x-if="pvSubmitted">
         <div class="wd-bento mt-5 border-l-4 border-l-[#047857] bg-[#ECFDF5] p-8 text-center">
-            <p class="font-mono text-xs font-bold text-[#047857] uppercase">Simulasi Pengiriman Berhasil</p>
+            <p class="text-xs font-bold text-[#047857] uppercase">Simulasi Pengiriman Berhasil</p>
             <h3 class="mt-2 text-xl font-extrabold text-slate-900" x-text="settings.confirmation_message || 'Respons Anda telah direkam.'"></h3>
             <button type="button" @click="pvStep = 0; pvSubmitted = false; pvAnswers = {};" class="mt-5 rounded-xl bg-[#0069A8] px-4 py-2 text-xs font-bold text-white">
                 Ulangi Simulasi
@@ -37,11 +37,11 @@
     <template x-if="!pvSubmitted && sectionsList()[pvStep]">
         <div class="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside class="wd-bento p-4 text-xs">
-                <p class="font-mono text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Navigasi Bagian</p>
+                <p class="text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Navigasi Bagian</p>
                 <ol class="mt-2.5 space-y-1.5">
                     <template x-for="(sec, sIdx) in sectionsList()" :key="sec.id">
                         <li :class="pvStep === sIdx ? 'bg-[#F0F9FF] font-bold text-[#0069A8]' : 'text-slate-600'" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5">
-                            <span class="font-mono text-[10px]" x-text="`${sIdx + 1}.`"></span>
+                            <span class="text-[10px] tabular-nums" x-text="`${sIdx + 1}.`"></span>
                             <span class="truncate" x-text="sec.title"></span>
                         </li>
                     </template>
@@ -147,7 +147,7 @@
                                             <span x-text="entry.item.config?.scale_min_label || ''"></span>
                                             <div class="flex gap-2">
                                                 <template x-for="n in scaleRange(entry.item.config)" :key="n">
-                                                    <button type="button" @click="pvAnswers[entry.item.id] = n" :class="pvAnswers[entry.item.id] == n ? 'bg-[#0069A8] text-white border-[#0069A8]' : 'bg-white text-slate-700 border-slate-300'" class="h-9 w-9 rounded-lg border font-mono font-bold transition" x-text="n"></button>
+                                                    <button type="button" @click="pvAnswers[entry.item.id] = n" :class="pvAnswers[entry.item.id] == n ? 'bg-[#0069A8] text-white border-[#0069A8]' : 'bg-white text-slate-700 border-slate-300'" class="h-9 w-9 rounded-lg border font-bold tabular-nums transition" x-text="n"></button>
                                                 </template>
                                             </div>
                                             <span x-text="entry.item.config?.scale_max_label || ''"></span>

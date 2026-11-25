@@ -178,7 +178,7 @@ class DataFormController extends Controller
                 'pengaturan' => $data['settings'],
                 'status_preprocessing' => 'belum',
                 'tanggal_waktu' => $data['deadline'],
-                'status_aktif' => true,
+                'status_aktif' => $request->has('status_aktif') ? $request->boolean('status_aktif') : true,
                 'dibuat_oleh' => $request->user()->id,
             ]);
 
@@ -442,7 +442,7 @@ class DataFormController extends Controller
         if ($dataForm->status_aktif) {
             $dataForm->tutupFormulir();
 
-            return back()->with('info', "Formulir “{$dataForm->judul}” ditutup.");
+            return back()->with('info', "Formulir “{$dataForm->judul}” ditutup dan kini tersedia di Pre-processing Data.");
         }
 
         if ($dataForm->tanggal_waktu === null || $dataForm->tanggal_waktu->isPast()) {

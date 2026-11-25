@@ -76,7 +76,7 @@ class DataForm extends Model
             'closed_message' => 'Formulir ini sudah tidak menerima respons baru.',
             'show_progress_bar' => true,
             'shuffle_questions' => false,
-            'confirmation_message' => 'Respons Anda telah direkam dan masuk ke antrean Pre-processing Wali Data.',
+            'confirmation_message' => 'Terima kasih, respons Anda telah tersimpan.',
             'show_another_response_link' => true,
             'show_summary_after_submit' => false,
             'default_required' => false,
@@ -297,6 +297,11 @@ class DataForm extends Model
         return (bool) $this->status_aktif
             && $this->tanggal_waktu !== null
             && $this->tanggal_waktu->isFuture();
+    }
+
+    public function isClosed(): bool
+    {
+        return ! $this->isOpen();
     }
 
     public function isPreprocessed(): bool

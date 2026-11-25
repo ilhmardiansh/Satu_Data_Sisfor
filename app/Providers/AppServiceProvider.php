@@ -55,7 +55,7 @@ class AppServiceProvider extends ServiceProvider
                     }
 
                     if (Schema::hasTable('formulir')) {
-                        $formsNeedingPreprocessingCount = DataForm::query()
+                        $formsNeedingPreprocessingCount = DataForm::closed()
                             ->where('status_preprocessing', 'proses')
                             ->count();
                     }

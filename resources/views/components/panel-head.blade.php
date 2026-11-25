@@ -1,77 +1,82 @@
 @props([
+    'eyebrow' => null,
     'title',
     'desc' => null,
-    'eyebrow' => null,
-    'scene' => null,
     'badge' => null,
-    'badgeTone' => 'sky',
+    'badgeTone' => 'info',
+    'scene' => null,
 ])
 
 @if($scene)
-    <header class="wd-stage-frame mb-6 px-6 py-6 sm:px-8 sm:py-7">
-        <div data-scene="walidata-header"
-             data-scene-mode="{{ $scene }}"
-             aria-hidden="true"
-             class="pointer-events-none absolute inset-y-0 right-0 hidden w-[54%] opacity-90 md:block"
-             style="mask-image: linear-gradient(to left, #000 58%, transparent 100%); -webkit-mask-image: linear-gradient(to left, #000 58%, transparent 100%);"></div>
+    @php
+        $darkBadgeClass = match ($badgeTone) {
+            'emerald', 'success' => 'bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-300/30',
+            'amber', 'warning' => 'bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30',
+            'red', 'danger' => 'bg-red-400/20 text-red-200 ring-1 ring-red-300/30',
+            default => 'bg-sky-400/20 text-[#74D4FF] ring-1 ring-sky-300/30',
+        };
+    @endphp
 
-        <div class="relative z-10 flex flex-wrap items-end justify-between gap-5">
-            <div class="max-w-2xl">
-                @if($eyebrow || $badge)
-                    <div class="mb-2 flex flex-wrap items-center gap-2.5">
-                        @if($eyebrow)
-                            <span class="font-mono text-[11px] font-bold tracking-[0.16em] text-[#74D4FF] uppercase">
-                                {{ $eyebrow }}
-                            </span>
-                        @endif
-                        @if($badge)
-                            @php
-                                $badgeCls = match ($badgeTone) {
-                                    'amber' => 'bg-amber-400/20 text-amber-200 ring-amber-300/35',
-                                    'emerald' => 'bg-emerald-400/20 text-emerald-200 ring-emerald-300/35',
-                                    default => 'bg-sky-400/20 text-[#BAE6FD] ring-sky-300/35',
-                                };
-                            @endphp
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-[11px] font-bold ring-1 {{ $badgeCls }}">
-                                {{ $badge }}
-                            </span>
-                        @endif
-                    </div>
-                @endif
+    <header class="wd-stage-frame mb-6 px-5 py-5 sm:px-7 sm:py-6">
+        <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+            <div data-scene="walidata-header" data-scene-mode="{{ $scene }}" class="h-full w-full"></div>
+        </div>
+        <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#09122C]/92 via-[#101F4A]/72 to-transparent" aria-hidden="true"></div>
 
-                <h1 class="text-2xl font-extrabold tracking-tight text-balance text-white sm:text-[28px]">
-                    {{ $title }}
-                </h1>
-
+        <div class="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white">{{ $title }}</h1>
+                    @if($badge)
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums {{ $darkBadgeClass }}">
+                            {{ $badge }}
+                        </span>
+                    @endif
+                </div>
                 @if($desc)
-                    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-200/95 sm:text-[15px]">
-                        {{ $desc }}
-                    </p>
+                    <p class="mt-1.5 max-w-2xl text-sm text-slate-200">{{ $desc }}</p>
                 @endif
             </div>
 
-            @if(trim($slot) !== '')
-                <div class="relative z-10 flex flex-wrap items-center gap-2.5">
+            @if(isset($slot) && trim((string) $slot) !== '')
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                     {{ $slot }}
                 </div>
             @endif
         </div>
     </header>
 @else
-    <div class="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
-        <div>
-            @if($eyebrow)
-                <p class="mb-1 font-mono text-[11px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">{{ $eyebrow }}</p>
-            @endif
-            <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-[26px]">{{ $title }}</h1>
-            @if($desc)
-                <p class="mt-1 text-[15px] text-[#45556C]">{{ $desc }}</p>
+    @php
+        $badgeClass = match ($badgeTone) {
+            'emerald', 'success' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
+            'amber', 'warning' => 'border-amber-200 bg-amber-50 text-amber-800',
+            'red', 'danger' => 'border-red-200 bg-red-50 text-red-700',
+            'slate', 'neutral' => 'border-slate-200 bg-slate-100 text-slate-700',
+            default => 'border-[#bae6fd] bg-[#F0F9FF] text-[#0069A8]',
+        };
+    @endphp
+
+    <header class="mb-6 border-b border-slate-200/80 pb-5">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">{{ $title }}</h1>
+                    @if($badge)
+                        <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold tabular-nums {{ $badgeClass }}">
+                            {{ $badge }}
+                        </span>
+                    @endif
+                </div>
+                @if($desc)
+                    <p class="mt-1.5 max-w-2xl text-sm text-[#475569]">{{ $desc }}</p>
+                @endif
+            </div>
+
+            @if(isset($slot) && trim((string) $slot) !== '')
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    {{ $slot }}
+                </div>
             @endif
         </div>
-        @if(trim($slot) !== '')
-            <div class="flex flex-wrap gap-2">
-                {{ $slot }}
-            </div>
-        @endif
-    </div>
+    </header>
 @endif

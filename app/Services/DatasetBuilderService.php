@@ -213,10 +213,32 @@ class DatasetBuilderService
                 $fields,
                 fn (array $fl): bool => in_array($fl['type'] ?? '', ['number', 'linear_scale', 'rating'], true)
             ));
-            $groupableFields = array_values(array_filter(
+            $groupableFields = array_values(array_map(function (array $fl) use ($validSubs): array {
+                $fid = (string) ($fl['id'] ?? '');
+                $distinct = [];
+                foreach ($validSubs as $sub) {
+                    $raw = trim((string) ($sub->values[$fid] ?? ''));
+                    if (($fl['type'] ?? '') === 'checkbox' && $raw !== '') {
+                        foreach (explode(',', $raw) as $part) {
+                            $tok = trim($part);
+                            if ($tok !== '') {
+                                $distinct[mb_strtolower($tok)] = true;
+                            }
+                        }
+                    } else {
+                        $distinct[mb_strtolower($raw !== '' ? $raw : '(kosong)')] = true;
+                    }
+                }
+                foreach ($fl['options'] ?? [] as $opt) {
+                    $distinct[mb_strtolower((string) $opt)] = true;
+                }
+                $fl['uniqueCount'] = count($distinct);
+
+                return $fl;
+            }, array_values(array_filter(
                 $fields,
                 fn (array $fl): bool => in_array($fl['type'] ?? '', ['select', 'radio', 'checkbox', 'text', 'linear_scale', 'rating'], true)
-            ));
+            ))));
 
             return [
                 'id' => $form->id,
@@ -225,6 +247,7 @@ class DatasetBuilderService
                 'desc' => $form->deskripsi ?? '',
                 'category_id' => $form->id_kategori,
                 'kategoriCode' => $form->category?->code ?? '',
+                'categoryName' => $form->category?->name ?? '',
                 'tahun' => $form->tahun,
                 'periode' => $form->periode,
                 'statusPreprocessing' => $form->status_preprocessing ?? 'belum',

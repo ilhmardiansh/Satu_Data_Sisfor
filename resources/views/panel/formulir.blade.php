@@ -9,12 +9,11 @@
 
 <div x-data="formGalleryManager()">
     <x-panel-head
-        eyebrow="TAHAP 01 · PENGUMPULAN DATA"
         scene="formulir"
         badge="{{ $counts['open'] ?? 0 }} Aktif"
         badgeTone="sky"
         title="Instrumen Formulir"
-        desc="Rancang instrumen pengumpulan data lengkap melalui Studio Satu Data UNUSA di halaman penuh, atur percabangan halaman & validasi respons, lalu bagikan kepada Produsen Data."
+        desc="Buat formulir pendataan dan bagikan tautannya ke Produsen Data."
     >
         <a href="{{ route('panel.formulir.create') }}"
            class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2.5 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8] motion-safe:active:scale-[0.98]">
@@ -23,30 +22,19 @@
         </a>
     </x-panel-head>
 
-    <!-- Galeri Template Cepat Studio Satu Data UNUSA (Halaman Baru) -->
     <section class="mb-5">
-        <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-            <p class="font-mono text-[11px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Mulai Instrumen dari Template</p>
-            <span class="text-xs text-[#475569]">Terbuka di halaman Studio Workbench UNUSA 3-panel</span>
-        </div>
+        <p class="mb-2.5 text-xs font-bold tracking-wide text-[#0069A8] uppercase">Mulai dari Template</p>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             @foreach($templates as $tpl)
                 <a href="{{ route('panel.formulir.create', ['template' => $tpl['slug']]) }}"
-                   class="wd-bento-interactive group flex flex-col justify-between p-4">
-                    <div>
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="grid h-9 w-9 place-items-center rounded-xl bg-[#F0F9FF] text-[#0069A8] transition group-hover:bg-[#0069A8] group-hover:text-white">
-                                <i data-lucide="{{ $tpl['icon'] }}" class="h-4 w-4" aria-hidden="true"></i>
-                            </span>
-                            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">{{ $tpl['badge'] }}</span>
-                        </div>
-                        <p class="mt-3 text-sm font-extrabold text-slate-900 group-hover:text-[#0069A8]">{{ $tpl['name'] }}</p>
-                        <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-[#475569]">{{ $tpl['desc'] }}</p>
+                   class="wd-bento-interactive group flex items-center gap-3 p-3.5">
+                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F0F9FF] text-[#0069A8] transition group-hover:bg-[#0069A8] group-hover:text-white">
+                        <i data-lucide="{{ $tpl['icon'] }}" class="h-4 w-4" aria-hidden="true"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">{{ $tpl['badge'] }}</span>
+                        <p class="mt-1 truncate text-sm font-bold text-slate-900 group-hover:text-[#0069A8]">{{ $tpl['name'] }}</p>
                     </div>
-                    <p class="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-[#0069A8]">
-                        <span>Buka Studio</span>
-                        <i data-lucide="arrow-right" class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
-                    </p>
                 </a>
             @endforeach
         </div>
@@ -58,7 +46,7 @@
             @foreach(['all' => 'Semua', 'open' => 'Dibuka', 'closed' => 'Ditutup'] as $k => $label)
                 <a href="{{ route('panel.formulir', ['status' => $k]) }}"
                    class="inline-flex min-h-[38px] items-center rounded-lg px-3.5 py-1.5 text-xs font-bold transition {{ $status === $k ? 'bg-[#0069A8] text-white' : 'text-slate-600 hover:text-slate-900' }}">
-                    {{ $label }} <span class="ml-1.5 font-mono opacity-85">({{ $counts[$k] ?? 0 }})</span>
+                    {{ $label }} <span class="ml-1.5 tabular-nums opacity-85">({{ $counts[$k] ?? 0 }})</span>
                 </a>
             @endforeach
         </div>
@@ -105,7 +93,7 @@
                         <tr x-show="matchesSearch(@js($searchKey))" class="transition-colors hover:bg-[#F8FAFC]">
                             <td class="px-4 py-3.5 text-sm text-slate-600">
                                 <div class="flex flex-wrap items-center gap-1.5">
-                                    <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#0069A8]">{{ $f->code }}</span>
+                                    <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-[#0069A8]">{{ $f->code }}</span>
                                     @if($f->batasi_satu_respon)
                                         <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700">1x/akun</span>
                                     @endif
@@ -141,6 +129,8 @@
                             <td class="px-4 py-3.5 text-sm">
                                 @if($f->status_preprocessing === 'siap')
                                     <span class="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] px-2.5 py-1 text-[11px] font-bold text-[#047857]">Siap Dataset</span>
+                                @elseif($f->isOpen())
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Menunggu ditutup</span>
                                 @elseif($f->status_preprocessing === 'proses' || $f->submissions_count > 0)
                                     <span class="inline-flex items-center gap-1 rounded-md bg-[#FFFBEB] px-2.5 py-1 text-[11px] font-bold text-[#92400E]">Perlu Pre-processing</span>
                                 @else
@@ -148,7 +138,7 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3.5 text-sm tabular-nums text-slate-700">
-                                <p class="font-mono font-bold text-slate-900">{{ $f->submissions_count }}</p>
+                                <p class="font-bold tabular-nums text-slate-900">{{ $f->submissions_count }}</p>
                                 @if($f->submissions_count > 0)
                                     <div class="mt-1.5 h-1 w-24 overflow-hidden rounded-full bg-slate-200">
                                         <div class="h-full rounded-full bg-[#047857]" style="width: {{ $validPct }}%"></div>
@@ -176,12 +166,22 @@
                                     <form method="POST" action="{{ route('panel.formulir.toggle', $f->code) }}" class="inline">
                                         @csrf
                                         @method('PATCH')
-                                        <button type="submit"
-                                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#0069A8] hover:text-[#0069A8]"
-                                                title="{{ $f->status_aktif ? 'Tutup formulir' : 'Buka formulir' }}"
-                                                aria-label="{{ $f->status_aktif ? 'Tutup formulir' : 'Buka formulir' }}">
-                                            <i data-lucide="{{ $f->status_aktif ? 'lock' : 'unlock' }}" class="h-4 w-4" aria-hidden="true"></i>
-                                        </button>
+                                        @if($f->isOpen())
+                                            <button type="submit"
+                                                    class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-800 transition hover:bg-amber-100"
+                                                    title="Tutup formulir agar dapat masuk Pre-processing"
+                                                    aria-label="Tutup formulir">
+                                                <i data-lucide="lock" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                                                <span>Tutup</span>
+                                            </button>
+                                        @else
+                                            <button type="submit"
+                                                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#0069A8] hover:text-[#0069A8]"
+                                                    title="{{ $f->status_aktif ? 'Tutup formulir' : 'Buka kembali formulir' }}"
+                                                    aria-label="{{ $f->status_aktif ? 'Tutup formulir' : 'Buka formulir' }}">
+                                                <i data-lucide="{{ $f->status_aktif ? 'lock' : 'unlock' }}" class="h-4 w-4" aria-hidden="true"></i>
+                                            </button>
+                                        @endif
                                     </form>
                                     <form method="POST" action="{{ route('panel.formulir.duplicate', $f->code) }}" class="inline">
                                         @csrf
@@ -192,12 +192,14 @@
                                             <i data-lucide="copy" class="h-4 w-4" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                    <a href="{{ route('panel.preprocessing.show', $f->code) }}"
-                                       class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#0069A8] hover:text-[#0069A8]"
-                                       title="Buka Pre-processing Data"
-                                       aria-label="Buka Pre-processing Data">
-                                        <i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true"></i>
-                                    </a>
+                                    @if($f->isClosed())
+                                        <a href="{{ route('panel.preprocessing.show', $f->code) }}"
+                                           class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[#0069A8] px-3 text-xs font-bold text-white transition hover:bg-[#005187]"
+                                           title="Buka Pre-processing Data"
+                                           aria-label="Buka Pre-processing Data">
+                                            <span>Pre-processing</span>
+                                        </a>
+                                    @endif
                                     <a href="{{ route('panel.formulir.edit', $f->code) }}"
                                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#0069A8] hover:text-[#0069A8]"
                                        title="Ubah di Studio Formulir"

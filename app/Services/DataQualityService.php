@@ -146,7 +146,22 @@ class DataQualityService
             return implode("\n", $cleanedLines);
         }
 
-        $clean = preg_replace('/\s+/', ' ', trim($value)) ?? trim($value);
+        $clean = preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
+
+        if ($type === 'date' && $clean !== '') {
+            $config = is_array($field['config'] ?? null) ? $field['config'] : [];
+            $includeTime = (bool) ($config['include_time'] ?? false);
+            $includeYear = (bool) ($config['include_year'] ?? true);
+
+            if (! $includeTime && $includeYear) {
+                foreach (['!Y-m-d', '!Y/m/d', '!d/m/Y', '!d-m-Y'] as $fmt) {
+                    $dt = DateTimeImmutable::createFromFormat($fmt, $clean);
+                    if ($dt && $dt->format(ltrim($fmt, '!')) === $clean) {
+                        return $dt->format('Y-m-d');
+                    }
+                }
+            }
+        }
 
         if ($type === 'number' && ($options['normalize_numbers'] ?? false) && $clean !== '') {
             $stripped = preg_replace('/rp|\s|%/iu', '', $clean) ?? $clean;

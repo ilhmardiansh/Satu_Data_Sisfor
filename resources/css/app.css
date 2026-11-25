@@ -233,8 +233,6 @@
     /* Wali Data Architectural Studio Surfaces */
     .wd-studio-bg {
         background-color: var(--wd-canvas);
-        background-image: radial-gradient(rgba(24, 38, 84, 0.065) 1px, transparent 1px);
-        background-size: 22px 22px;
     }
 
     .wd-stage-frame {
@@ -299,8 +297,6 @@
         --gf-soft: #f0f9ff;
         --gf-canvas: #f3f6fa;
         background-color: var(--gf-canvas);
-        background-image: radial-gradient(rgba(24, 38, 84, 0.055) 1px, transparent 1px);
-        background-size: 22px 22px;
     }
 
     .gf-studio-canvas[data-gf-palette='benhur'] {

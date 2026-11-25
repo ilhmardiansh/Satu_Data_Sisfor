@@ -15,12 +15,11 @@
 
 <div x-data="permohonanManager()">
     <x-panel-head
-        eyebrow="LAYANAN AKSES · DATASET PRIVATE"
         scene="permohonan"
         badge="{{ $counts['menunggu'] ?? 0 }} Menunggu"
         :badgeTone="($counts['menunggu'] ?? 0) > 0 ? 'amber' : 'sky'"
         title="Permohonan Data"
-        desc="Tinjau pengajuan akses dataset berstatus Private. Permohonan yang disetujui membuka unduhan untuk pemohon terkait."
+        desc="Tinjau pengajuan akses dataset berstatus Private."
     />
 
     <div class="wd-bento mb-6 flex flex-wrap items-center justify-between gap-3 p-3">
@@ -30,7 +29,7 @@
                 <a href="{{ route('panel.permohonan', ['tab' => $t['k']]) }}"
                    class="inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition {{ $active ? 'bg-[#0069A8] text-white' : 'text-slate-600 hover:text-slate-900' }}">
                     <span>{{ $t['label'] }}</span>
-                    <span class="rounded-full px-1.5 font-mono text-[11px] font-bold {{ $active ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-700' }}">
+                    <span class="rounded-full px-1.5 text-[11px] font-bold tabular-nums {{ $active ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-700' }}">
                         {{ $t['count'] }}
                     </span>
                 </a>
@@ -66,14 +65,14 @@
                     <div class="flex flex-wrap items-start justify-between gap-4">
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="rounded-md bg-[#F0F9FF] px-2 py-0.5 font-mono text-[11px] font-bold text-[#0069A8]">
+                                <span class="rounded-md bg-[#F0F9FF] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[#0069A8]">
                                     {{ $r->code }}
                                 </span>
                                 <x-req-status :status="$r->status" />
                                 @if($r->dataset)
                                     <x-access-badge :access="$r->dataset->access" />
                                 @endif
-                                <span class="font-mono text-xs text-[#475569]">
+                                <span class="text-xs tabular-nums text-[#475569]">
                                     {{ $r->requested_at?->format('d M Y, H:i') }}
                                 </span>
                             </div>
@@ -84,9 +83,9 @@
 
                             <div class="mt-2.5 grid grid-cols-1 gap-2 rounded-xl border border-slate-200/70 bg-[#F8FAFC] px-3.5 py-2.5 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
                                 <span><strong class="font-semibold text-slate-800">Pemohon:</strong> {{ $r->nama }}</span>
-                                <span><strong class="font-semibold text-slate-800">NIM/NIP:</strong> <span class="font-mono">{{ $r->nim }}</span></span>
+                                <span><strong class="font-semibold text-slate-800">NIM/NIP:</strong> <span class="tabular-nums">{{ $r->nim }}</span></span>
                                 <span class="truncate"><strong class="font-semibold text-slate-800">Email:</strong> {{ $r->email }}</span>
-                                <span><strong class="font-semibold text-slate-800">HP:</strong> <span class="font-mono">{{ $r->hp }}</span></span>
+                                <span><strong class="font-semibold text-slate-800">HP:</strong> <span class="tabular-nums">{{ $r->hp }}</span></span>
                             </div>
 
                             <div class="mt-3 rounded-xl border border-slate-200/80 border-l-4 border-l-[#0069A8] bg-white px-4 py-3 text-sm">
@@ -163,7 +162,7 @@
             <div role="dialog" aria-modal="true" class="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
-                        <p class="font-mono text-xs font-bold text-[#0069A8]" x-text="target.code"></p>
+                        <p class="text-xs font-bold tabular-nums text-[#0069A8]" x-text="target.code"></p>
                         <h2 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900" x-text="target.mode === 'disetujui' ? 'Setujui permohonan akses?' : 'Tolak permohonan akses?'"></h2>
                         <p class="mt-1 text-xs text-[#475569]" x-text="target.requester + ' · ' + target.datasetTitle"></p>
                     </div>

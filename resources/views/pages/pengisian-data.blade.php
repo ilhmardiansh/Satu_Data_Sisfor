@@ -33,8 +33,8 @@
                 </h1>
                 <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base motion-safe:animate-fade-up motion-safe:[animation-delay:140ms]">
                     {{ $t(
-                        'Isian Anda masuk sebagai data mentah untuk melalui fase Pre-processing Wali Data sebelum dikemas menjadi dataset dan visualisasi resmi prodi.',
-                        'Your response enters Wali Data pre-processing before being compiled into official datasets and dashboards.'
+                        'Pilih formulir yang tersedia untuk mulai mengisi data.',
+                        'Select an available form to submit your data.'
                     ) }}
                 </p>
             </div>
@@ -178,6 +178,7 @@ function pengisianDataManager() {
     return {
         forms: @json($formsPayload),
         isLoggedIn: @json($isLoggedIn),
+        userRole: @json($userRole),
         searchQuery: @json($q),
         targetFilter: @json($target),
 
@@ -194,13 +195,16 @@ function pengisianDataManager() {
             if (!this.isLoggedIn) {
                 return @js($t('Buka formulir (Perlu masuk)', 'Open form (Sign in required)'));
             }
+            if (this.userRole === 'wali') {
+                return @js($t('Buka formulir', 'Open form'));
+            }
             if (form.batasiSatuRespon && form.mine > 0) {
                 return @js($t('Sudah diisi · Lihat detail', 'Already submitted · View details'));
             }
             if (form.eligible) {
                 return form.mine > 0 ? @js($t('Isi formulir lagi', 'Submit again')) : @js($t('Isi formulir', 'Fill out form'));
             }
-            return @js($t('Lihat instrumen formulir', 'View form instrument'));
+            return @js($t('Lihat formulir', 'View form'));
         },
     };
 }

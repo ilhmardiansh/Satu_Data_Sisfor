@@ -26,14 +26,14 @@
             <div x-show="leftPaneTab === 'palette'" class="max-h-[calc(100vh-15rem)] space-y-4 overflow-y-auto p-3.5">
                 <template x-for="grp in paletteGroups" :key="grp.title">
                     <div>
-                        <p class="mb-2 font-mono text-[10px] font-bold tracking-[0.14em] text-[#475569] uppercase" x-text="grp.title"></p>
+                        <p class="mb-2 text-[10px] font-bold tracking-[0.14em] text-[#475569] uppercase" x-text="grp.title"></p>
                         <div class="grid grid-cols-1 gap-1.5">
                             <template x-for="pt in grp.items" :key="pt.type">
                                 <button type="button"
                                         @click="addItem(pt.type)"
                                         class="group flex items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-[#F8FAFC] px-3 py-2 text-left text-xs font-semibold text-slate-800 transition hover:border-[#0069A8] hover:bg-[#F0F9FF] hover:text-[#0069A8]">
                                     <span class="truncate" x-text="pt.label"></span>
-                                    <span class="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-500 ring-1 ring-slate-200 group-hover:text-[#0069A8]" x-text="pt.code"></span>
+                                    <span class="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200 group-hover:text-[#0069A8]" x-text="pt.code"></span>
                                 </button>
                             </template>
                         </div>
@@ -57,7 +57,7 @@
                         :class="selectedTarget === 'header' ? 'border-[#0069A8] bg-[#F0F9FF] text-[#0069A8]' : 'border-slate-200 bg-[#F8FAFC] text-slate-800'"
                         class="flex w-full items-center justify-between rounded-xl border px-3 py-2 font-bold">
                     <span class="truncate">Sampul &amp; Metadata</span>
-                    <span class="font-mono text-[10px]">TOP</span>
+                    <span class="text-[10px]">TOP</span>
                 </button>
 
                 <template x-for="(sec, sIdx) in sectionsList()" :key="sec.id">
@@ -66,7 +66,7 @@
                                 @click="if (sec.itemIndex >= 0) { selectItem(sec.id); document.getElementById('gf-card-' + sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }"
                                 class="flex w-full items-center justify-between rounded-lg bg-slate-100/90 px-2.5 py-1.5 text-left text-[11px] font-extrabold text-[#182654] hover:bg-[#F0F9FF] hover:text-[#0069A8]">
                             <span class="truncate" x-text="`Bagian ${sIdx + 1}: ${sec.title || 'Bagian'}`"></span>
-                            <span class="font-mono text-[10px] text-slate-500" x-text="sec.items.length"></span>
+                            <span class="text-[10px] tabular-nums text-slate-500" x-text="sec.items.length"></span>
                         </button>
                         <div class="ml-2 space-y-0.5 border-l border-slate-200 pl-2">
                             <template x-for="entry in sec.items" :key="entry.item.id">
@@ -108,7 +108,7 @@
 
             <div class="relative z-10 p-6 text-white sm:p-7">
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-mono text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">
                         <span class="h-1.5 w-1.5 rounded-full bg-[#38BDF8]"></span>
                         SAMPUL INSTRUMEN PENGUMPULAN DATA
                     </span>
@@ -143,8 +143,8 @@
                 <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-white/15 pt-3 text-[11px] text-slate-200">
                     <span class="rounded-md bg-white/15 px-2.5 py-1 font-semibold" x-text="`Sasaran: ${meta.target}`"></span>
                     <span class="rounded-md bg-white/15 px-2.5 py-1 font-semibold" x-text="`${meta.tahun} · Semester ${meta.periode}`"></span>
-                    <span class="rounded-md bg-white/15 px-2.5 py-1 font-mono" x-text="`Tenggat: ${meta.deadline ? meta.deadline.replace('T', ' ') : '-'}`"></span>
-                    <span class="rounded-md bg-white/15 px-2.5 py-1 font-mono" x-text="`${inputCount()} pertanyaan`"></span>
+                    <span class="rounded-md bg-white/15 px-2.5 py-1 tabular-nums" x-text="`Tenggat: ${meta.deadline ? meta.deadline.replace('T', ' ') : '-'}`"></span>
+                    <span class="rounded-md bg-white/15 px-2.5 py-1 tabular-nums" x-text="`${inputCount()} pertanyaan`"></span>
                 </div>
             </div>
         </section>
@@ -174,16 +174,16 @@
                             </span>
 
                             <template x-if="item.type === 'section'">
-                                <span class="inline-flex items-center gap-1.5 rounded-lg bg-[#182654] px-2.5 py-1 font-mono text-[11px] font-bold text-white"
+                                <span class="inline-flex items-center gap-1.5 rounded-lg bg-[#182654] px-2.5 py-1 text-[11px] font-bold text-white"
                                       x-text="`BAGIAN ${String(sectionNumberForItem(idx)).padStart(2, '0')} / ${String(totalSections()).padStart(2, '0')}`"></span>
                             </template>
 
                             <template x-if="!isInput(item.type) && item.type !== 'section'">
-                                <span class="rounded-lg bg-[#F0F9FF] px-2.5 py-1 font-mono text-[11px] font-bold text-[#0069A8]" x-text="typeLabel(item.type)"></span>
+                                <span class="rounded-lg bg-[#F0F9FF] px-2.5 py-1 text-[11px] font-bold text-[#0069A8]" x-text="typeLabel(item.type)"></span>
                             </template>
 
                             <template x-if="isInput(item.type)">
-                                <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-[#F0F9FF] px-1.5 font-mono text-xs font-extrabold text-[#0069A8]"
+                                <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-[#F0F9FF] px-1.5 text-xs font-extrabold tabular-nums text-[#0069A8]"
                                       x-text="String(questionNumberAt(idx)).padStart(2, '0')"></span>
                             </template>
 
@@ -194,7 +194,7 @@
                             <span x-show="item.required" class="rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-bold text-[#B91C1C]">Wajib</span>
                             <span x-show="item.config?.validation?.enabled" class="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-[#0069A8]">Validasi</span>
                             <span x-show="item.config?.use_branching" class="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-[#92400E]">Bercabang</span>
-                            <span x-show="settings.is_quiz && item.config?.points > 0" class="rounded-md bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-bold text-[#047857]" x-text="`${item.config?.points || 0} poin`"></span>
+                            <span x-show="settings.is_quiz && item.config?.points > 0" class="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#047857]" x-text="`${item.config?.points || 0} poin`"></span>
                         </div>
 
                         <div class="flex items-center gap-1">
@@ -345,7 +345,7 @@
                                                         <span class="inline-block h-4 w-4 rounded border-2 border-slate-300 bg-white"></span>
                                                     </template>
                                                     <template x-if="item.type === 'select'">
-                                                        <span class="font-mono text-xs font-bold text-slate-500" x-text="`${oIdx + 1}.`"></span>
+                                                        <span class="text-xs font-bold tabular-nums text-slate-500" x-text="`${oIdx + 1}.`"></span>
                                                     </template>
                                                 </span>
 
@@ -400,7 +400,7 @@
                                     <span class="font-semibold text-[#475569]" x-text="item.config?.scale_min_label || ''"></span>
                                     <div class="flex flex-wrap gap-1.5">
                                         <template x-for="n in scaleRange(item.config)" :key="n">
-                                            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white font-mono text-xs font-bold text-slate-700" x-text="n"></span>
+                                            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-bold tabular-nums text-slate-700" x-text="n"></span>
                                         </template>
                                     </div>
                                     <span class="font-semibold text-[#475569]" x-text="item.config?.scale_max_label || ''"></span>
@@ -413,7 +413,7 @@
                                     <template x-for="n in ratingRange(item.config)" :key="n">
                                         <span class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-sm text-[#0069A8]">
                                             <span x-text="item.config?.rating_icon === 'heart' ? '♥' : (item.config?.rating_icon === 'thumb' ? '👍' : '★')"></span>
-                                            <span class="font-mono text-[11px] font-bold text-slate-600" x-text="n"></span>
+                                            <span class="text-[11px] font-bold tabular-nums text-slate-600" x-text="n"></span>
                                         </span>
                                     </template>
                                 </div>
@@ -427,7 +427,7 @@
                                         <div class="space-y-1.5">
                                             <template x-for="(rowLbl, rIdx) in item.config.grid_rows" :key="`${item.id}_gr_${rIdx}`">
                                                 <div class="flex items-center gap-1.5">
-                                                    <span class="font-mono text-[10px] text-slate-400" x-text="`${rIdx + 1}.`"></span>
+                                                    <span class="text-[10px] tabular-nums text-slate-400" x-text="`${rIdx + 1}.`"></span>
                                                     <input type="text" x-model="item.config.grid_rows[rIdx]" class="h-8 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs" />
                                                     <button type="button" @click="removeGridRow(item, rIdx)" :disabled="item.config.grid_rows.length <= 1" class="text-xs font-bold text-[#B91C1C] disabled:opacity-30">×</button>
                                                 </div>
@@ -499,12 +499,12 @@
                 <div class="flex-1 space-y-4 overflow-y-auto p-4">
                     <template x-for="grp in paletteGroups" :key="grp.title">
                         <div>
-                            <p class="mb-2 font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase" x-text="grp.title"></p>
+                            <p class="mb-2 text-[10px] font-bold tracking-wider text-[#475569] uppercase" x-text="grp.title"></p>
                             <div class="grid grid-cols-1 gap-1.5">
                                 <template x-for="pt in grp.items" :key="pt.type">
                                     <button type="button" @click="addItem(pt.type)" class="flex items-center justify-between rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 py-2 text-xs font-semibold text-slate-800">
                                         <span x-text="pt.label"></span>
-                                        <span class="font-mono text-[10px] text-[#0069A8]" x-text="pt.code"></span>
+                                        <span class="text-[10px] text-[#0069A8]" x-text="pt.code"></span>
                                     </button>
                                 </template>
                             </div>
