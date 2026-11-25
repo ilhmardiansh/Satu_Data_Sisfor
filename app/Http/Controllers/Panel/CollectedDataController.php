@@ -9,7 +9,6 @@ use App\Models\FormSubmission;
 use App\Models\SubmissionValue;
 use App\Services\DataPreprocessingService;
 use App\Services\DataQualityService;
-use App\Services\DatasetBuilderService;
 use App\Services\SpreadsheetExportService;
 use App\Services\SpreadsheetImportService;
 use App\Support\CodeGenerator;
@@ -28,12 +27,16 @@ use Throwable;
 
 class CollectedDataController extends Controller
 {
+    protected function openFormBlockMessage(DataForm $form): string
+    {
+        return "Formulir “{$form->judul}” masih dibuka. Tutup formulir terlebih dahulu atau tunggu tenggat waktu berakhir sebelum melakukan Pre-processing.";
+    }
+
     public function index(
         Request $request,
         DataQualityService $quality,
-        DataPreprocessingService $preprocessing,
-        DatasetBuilderService $builder
-    ): View {
+        DataPreprocessingService $preprocessing
+    ): View|RedirectResponse {
         $formCode = trim((string) $request->query('form', ''));
         if ($formCode !== '') {
             $selectedForm = DataForm::query()
@@ -42,7 +45,13 @@ class CollectedDataController extends Controller
                 ->first();
 
             if ($selectedForm) {
-                return $this->renderWorkspace($request, $selectedForm, $quality, $preprocessing, $builder);
+                if ($selectedForm->isOpen()) {
+                    return redirect()
+                        ->route('panel.preprocessing')
+                        ->with('error', $this->openFormBlockMessage($selectedForm));
+                }
+
+                return $this->renderWorkspace($request, $selectedForm, $quality, $preprocessing);
             }
         }
 
@@ -62,7 +71,9 @@ class CollectedDataController extends Controller
             $sort = 'priority';
         }
 
-        $allForms = DataForm::query()
+        $openFormsCount = DataForm::open()->count();
+
+        $allForms = DataForm::closed()
             ->with(['category', 'kolomFormulir', 'processor'])
             ->withCount([
                 'submissions',
@@ -166,6 +177,7 @@ class CollectedDataController extends Controller
         return view('panel.preprocessing-index', compact(
             'formsPaginator',
             'summary',
+            'openFormsCount',
             'filterCategories',
             'years',
             'q',
@@ -181,20 +193,24 @@ class CollectedDataController extends Controller
         Request $request,
         DataForm $dataForm,
         DataQualityService $quality,
-        DataPreprocessingService $preprocessing,
-        DatasetBuilderService $builder
-    ): View {
+        DataPreprocessingService $preprocessing
+    ): View|RedirectResponse {
+        if ($dataForm->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($dataForm));
+        }
+
         $dataForm->loadMissing(['category', 'kolomFormulir', 'processor']);
 
-        return $this->renderWorkspace($request, $dataForm, $quality, $preprocessing, $builder);
+        return $this->renderWorkspace($request, $dataForm, $quality, $preprocessing);
     }
 
     protected function renderWorkspace(
         Request $request,
         DataForm $activeForm,
         DataQualityService $quality,
-        DataPreprocessingService $preprocessing,
-        DatasetBuilderService $builder
+        DataPreprocessingService $preprocessing
     ): View {
         $q = trim((string) $request->query('q', ''));
         $status = (string) $request->query('status', $request->boolean('only_issues') ? 'issues' : 'all');
@@ -257,16 +273,7 @@ class CollectedDataController extends Controller
             ]
         );
 
-        $allForms = DataForm::query()
-            ->with(['category', 'kolomFormulir', 'processor'])
-            ->withCount('submissions')
-            ->orderByDesc('created_at')
-            ->get();
-        $categories = Category::query()->orderBy('id')->get();
-        $builderFormsPayload = $builder->builderFormsPayload($allForms, $quality);
-
         return view('panel.data', compact(
-            'categories',
             'activeForm',
             'submissionsPaginator',
             'qualityIssues',
@@ -276,8 +283,7 @@ class CollectedDataController extends Controller
             'totalSubmissionsCount',
             'q',
             'status',
-            'onlyIssues',
-            'builderFormsPayload'
+            'onlyIssues'
         ));
     }
 
@@ -319,6 +325,12 @@ class CollectedDataController extends Controller
         DataQualityService $quality,
         DataPreprocessingService $preprocessing
     ): RedirectResponse {
+        if ($dataForm->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($dataForm));
+        }
+
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:10240'],
         ], [
@@ -433,6 +445,12 @@ class CollectedDataController extends Controller
         DataForm $dataForm,
         DataPreprocessingService $preprocessing
     ): RedirectResponse {
+        if ($dataForm->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($dataForm));
+        }
+
         $validated = $request->validate([
             'normalize_numbers' => ['nullable', 'boolean'],
             'text_case' => ['nullable', 'in:none,title,upper,lower'],
@@ -457,6 +475,12 @@ class CollectedDataController extends Controller
         DataForm $dataForm,
         DataPreprocessingService $preprocessing
     ): RedirectResponse {
+        if ($dataForm->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($dataForm));
+        }
+
         $validated = $request->validate([
             'scope' => ['required', 'in:same_values,same_user_and_values'],
             'action' => ['required', 'in:reject,delete'],
@@ -487,6 +511,12 @@ class CollectedDataController extends Controller
         DataForm $dataForm,
         DataPreprocessingService $preprocessing
     ): RedirectResponse {
+        if ($dataForm->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($dataForm));
+        }
+
         $validated = $request->validate([
             'field_code' => ['required', 'string', 'max:60'],
             'strategy' => ['required', 'in:mean,median,mode,constant,reject_missing'],
@@ -517,6 +547,12 @@ class CollectedDataController extends Controller
         DataForm $dataForm,
         DataPreprocessingService $preprocessing
     ): RedirectResponse {
+        if ($dataForm->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($dataForm));
+        }
+
         $res = $preprocessing->finalizeForm($dataForm, $request->user()->id);
 
         if (! $res['ok']) {
@@ -533,7 +569,7 @@ class CollectedDataController extends Controller
     public function editSubmission(
         FormSubmission $submission,
         DataQualityService $quality
-    ): View {
+    ): View|RedirectResponse {
         $submission->loadMissing([
             'dataForm.kolomFormulir',
             'dataForm.category',
@@ -545,6 +581,12 @@ class CollectedDataController extends Controller
         $form = $submission->dataForm;
         if (! $form) {
             abort(404, 'Formulir untuk isian ini tidak ditemukan.');
+        }
+
+        if ($form->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($form));
         }
 
         $fields = $form->fields ?? [];
@@ -661,6 +703,10 @@ class CollectedDataController extends Controller
 
         if (! $form) {
             return response()->json(['message' => 'Formulir tidak ditemukan.'], 404);
+        }
+
+        if ($form->isOpen()) {
+            return response()->json(['message' => $this->openFormBlockMessage($form)], 422);
         }
 
         $rawContent = (string) $request->getContent();
@@ -803,6 +849,12 @@ class CollectedDataController extends Controller
     ): RedirectResponse {
         $submission->loadMissing(['dataForm.kolomFormulir', 'dataIsian.kolomFormulir']);
         $form = $submission->dataForm;
+        if (! $form || $form->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $form ? $this->openFormBlockMessage($form) : 'Formulir untuk isian ini tidak ditemukan.');
+        }
+
         $form->loadMissing('kolomFormulir');
         $fields = $form->fields ?? [];
         $existingAttachments = $submission->attachments ?? [];
@@ -1119,12 +1171,18 @@ class CollectedDataController extends Controller
         FormSubmission $submission,
         DataPreprocessingService $preprocessing
     ): RedirectResponse {
+        $form = $submission->dataForm;
+        if ($form && $form->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($form));
+        }
+
         $validated = $request->validate([
             'status_validasi' => ['required', 'in:mentah,ditolak'],
             'catatan_validasi' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $form = $submission->dataForm;
         $submission->update([
             'status_validasi' => $validated['status_validasi'],
             'catatan_validasi' => trim((string) ($validated['catatan_validasi'] ?? '')) ?: null,
@@ -1148,6 +1206,12 @@ class CollectedDataController extends Controller
         DataPreprocessingService $preprocessing
     ): RedirectResponse {
         $form = $submission->dataForm;
+        if ($form && $form->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($form));
+        }
+
         $submission->loadMissing('dataIsian.kolomFormulir');
 
         foreach ($submission->attachments ?? [] as $path) {

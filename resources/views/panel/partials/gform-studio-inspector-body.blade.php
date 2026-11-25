@@ -4,7 +4,7 @@
     <template x-if="selectedTarget === 'header' || !activeItem()">
         <div class="space-y-4">
             <div class="border-b border-slate-100 pb-3">
-                <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Inspektor Instrumen</p>
+                <p class="text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Inspektor Instrumen</p>
                 <h3 class="mt-0.5 text-sm font-extrabold text-slate-900">Metadata &amp; Tata Kelola</h3>
             </div>
 
@@ -30,7 +30,7 @@
             <div class="grid grid-cols-2 gap-2.5">
                 <label class="block">
                     <span class="mb-1 block font-bold text-slate-700">Tahun</span>
-                    <input type="text" inputmode="numeric" x-model="meta.tahun" class="h-9 w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 font-mono font-bold text-slate-800" />
+                    <input type="text" inputmode="numeric" x-model="meta.tahun" class="h-9 w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 font-bold tabular-nums text-slate-800" />
                 </label>
                 <label class="block">
                     <span class="mb-1 block font-bold text-slate-700">Semester</span>
@@ -43,7 +43,7 @@
 
             <label class="block">
                 <span class="mb-1 block font-bold text-slate-700">Tenggat Pengumpulan <span class="text-[#B91C1C]">*</span></span>
-                <input type="datetime-local" x-model="meta.deadline" class="h-9 w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 font-mono font-semibold text-slate-800" />
+                <input type="datetime-local" x-model="meta.deadline" class="h-9 w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 font-semibold tabular-nums text-slate-800" />
             </label>
 
             <div class="space-y-2 border-t border-slate-100 pt-3">
@@ -68,10 +68,10 @@
         <div class="space-y-4">
             <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
                 <div>
-                    <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Inspektor Properti</p>
+                    <p class="text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Inspektor Properti</p>
                     <h3 class="mt-0.5 text-sm font-extrabold text-slate-900" x-text="typeLabel(activeItem().type)"></h3>
                 </div>
-                <span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600" x-text="activeItem().id"></span>
+                <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-slate-600" x-text="activeItem().id"></span>
             </div>
 
             <!-- 2A: Section Inspector -->
@@ -202,7 +202,7 @@
                     <!-- Type-Specific Options: Choice / Branching -->
                     <template x-if="isChoice(activeItem().type)">
                         <div class="space-y-2.5 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Pengaturan Pilihan</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Pengaturan Pilihan</p>
 
                             <template x-if="activeItem().type !== 'select'">
                                 <label class="flex cursor-pointer items-center justify-between gap-2 font-semibold text-slate-700">
@@ -246,7 +246,7 @@
                     <!-- Type-Specific Options: Linear Scale -->
                     <template x-if="activeItem().type === 'linear_scale'">
                         <div class="space-y-2.5 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Rentang Skala</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Rentang Skala</p>
                             <div class="grid grid-cols-2 gap-2">
                                 <label class="block">
                                     <span class="mb-1 block font-semibold text-slate-700">Dari</span>
@@ -272,7 +272,7 @@
                     <!-- Type-Specific Options: Rating -->
                     <template x-if="activeItem().type === 'rating'">
                         <div class="space-y-2.5 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Pengaturan Peringkat</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Pengaturan Peringkat</p>
                             <div class="grid grid-cols-2 gap-2">
                                 <label class="block">
                                     <span class="mb-1 block font-semibold text-slate-700">Level Maks</span>
@@ -297,7 +297,7 @@
                     <!-- Type-Specific Options: Grids -->
                     <template x-if="isGrid(activeItem().type)">
                         <div class="space-y-2 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Aturan Kisi</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Aturan Kisi</p>
                             <label class="flex cursor-pointer items-center justify-between gap-2 font-semibold text-slate-700">
                                 <span>Wajibkan 1 respons tiap baris</span>
                                 <input type="checkbox" x-model="activeItem().config.require_row_response" class="h-4 w-4 accent-[#0069A8]" />
@@ -316,7 +316,7 @@
                     <!-- Type-Specific Options: Date / Time -->
                     <template x-if="activeItem().type === 'date'">
                         <div class="space-y-2 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Format Tanggal</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Format Tanggal</p>
                             <label class="flex cursor-pointer items-center justify-between font-semibold text-slate-700">
                                 <span>Sertakan waktu</span>
                                 <input type="checkbox" x-model="activeItem().config.include_time" class="h-4 w-4 accent-[#0069A8]" />
@@ -330,7 +330,7 @@
 
                     <template x-if="activeItem().type === 'time'">
                         <div class="space-y-2 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Format Waktu</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Format Waktu</p>
                             <select x-model="activeItem().config.time_mode" class="h-9 w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 font-semibold">
                                 <option value="time">Waktu Jam (JJ:MM)</option>
                                 <option value="duration">Durasi (JJ:MM:DD)</option>
@@ -341,7 +341,7 @@
                     <!-- Type-Specific Options: File Upload -->
                     <template x-if="activeItem().type === 'file'">
                         <div class="space-y-2.5 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Aturan Unggah Berkas</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Aturan Unggah Berkas</p>
                             <label class="flex cursor-pointer items-center justify-between font-bold text-slate-800">
                                 <span>Batasi jenis berkas tertentu</span>
                                 <input type="checkbox" x-model="activeItem().config.restrict_file_types" class="h-4 w-4 accent-[#0069A8]" />
@@ -390,7 +390,7 @@
                     <template x-if="canValidate(activeItem().type)">
                         <div class="space-y-2.5 border-t border-slate-100 pt-3">
                             <div class="flex items-center justify-between">
-                                <span class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Validasi Respons</span>
+                                <span class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Validasi Respons</span>
                                 <button type="button"
                                         @click="toggleValidation(activeItem())"
                                         class="font-bold text-[#0069A8] hover:underline"
@@ -440,10 +440,10 @@
                     <!-- Quiz Answer Key & Scoring (Visible when Quiz Mode Active) -->
                     <template x-if="settings.is_quiz">
                         <div class="space-y-2.5 border-t border-slate-100 pt-3">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#047857] uppercase">Kunci Jawaban Kuis</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#047857] uppercase">Kunci Jawaban Kuis</p>
                             <label class="flex items-center justify-between gap-2 font-bold text-slate-700">
                                 <span>Bobot Poin</span>
-                                <input type="number" min="0" max="1000" x-model.number="activeItem().config.points" class="h-8 w-20 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-2 text-center font-mono font-bold text-[#047857]" />
+                                <input type="number" min="0" max="1000" x-model.number="activeItem().config.points" class="h-8 w-20 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-2 text-center font-bold tabular-nums text-[#047857]" />
                             </label>
                             <input type="text" x-model="activeItem().config.answer_key" placeholder="Kunci jawaban..." class="h-8 w-full rounded-lg border border-emerald-200 bg-white px-2.5" />
                             <input type="text" x-model="activeItem().config.feedback_correct" placeholder="Umpan balik benar" class="h-8 w-full rounded-lg border border-emerald-200 bg-white px-2.5" />

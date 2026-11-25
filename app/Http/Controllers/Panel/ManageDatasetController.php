@@ -16,11 +16,8 @@ use Illuminate\View\View;
 
 class ManageDatasetController extends Controller
 {
-    public function index(
-        Request $request,
-        DataQualityService $quality,
-        DatasetBuilderService $builder
-    ): View {
+    public function index(Request $request): View
+    {
         $q = trim((string) $request->query('q', ''));
         $kategori = (string) $request->query('kategori', 'all');
         $tahun = (string) $request->query('tahun', 'all');
@@ -49,12 +46,10 @@ class ManageDatasetController extends Controller
         $categories = Category::query()->orderBy('id')->get();
         $years = Dataset::query()->distinct()->orderByDesc('tahun')->pluck('tahun');
 
-        $allForms = DataForm::query()
-            ->with(['category', 'kolomFormulir'])
-            ->orderByDesc('created_at')
-            ->get();
-
-        $builderFormsPayload = $builder->builderFormsPayload($allForms, $quality);
+        $readyFormsCount = DataForm::closed()
+            ->where('status_preprocessing', 'siap')
+            ->whereHas('submissions', fn ($sub) => $sub->where('status_validasi', 'valid'))
+            ->count();
 
         return view('panel.dataset', compact(
             'datasets',
@@ -63,7 +58,34 @@ class ManageDatasetController extends Controller
             'q',
             'kategori',
             'tahun',
-            'builderFormsPayload'
+            'readyFormsCount'
+        ));
+    }
+
+    public function create(
+        Request $request,
+        DataQualityService $quality,
+        DatasetBuilderService $builder
+    ): View {
+        $categories = Category::query()->orderBy('id')->get();
+        $readyForms = DataForm::closed()
+            ->where('status_preprocessing', 'siap')
+            ->with(['category', 'kolomFormulir'])
+            ->orderByDesc('waktu_diproses')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $readyFormsPayload = array_values(array_filter(
+            $builder->builderFormsPayload($readyForms, $quality),
+            fn (array $item): bool => ($item['validCount'] ?? 0) > 0 && ! ($item['dirty'] ?? false)
+        ));
+
+        $preselectedFormCode = trim((string) $request->query('form', ''));
+
+        return view('panel.dataset-create', compact(
+            'categories',
+            'readyFormsPayload',
+            'preselectedFormCode'
         ));
     }
 
@@ -100,6 +122,13 @@ class ManageDatasetController extends Controller
         ]);
 
         $form = DataForm::query()->with('kolomFormulir')->findOrFail($validated['form_id']);
+
+        if ($form->isOpen()) {
+            return back()->withInput()->with(
+                'error',
+                'Formulir sumber masih dibuka. Tutup formulir dan selesaikan Pre-processing Data sebelum menyusun dataset.'
+            );
+        }
 
         if (! $form->isPreprocessed()) {
             return back()->withInput()->with(
@@ -252,6 +281,13 @@ class ManageDatasetController extends Controller
         }
 
         $form->loadMissing('kolomFormulir');
+        if ($form->isOpen()) {
+            return back()->with(
+                'error',
+                "Formulir {$form->judul} masih dibuka. Tutup formulir dan selesaikan Pre-processing Data sebelum menyinkronkan dataset."
+            );
+        }
+
         if (! $form->isPreprocessed()) {
             return back()->with(
                 'error',

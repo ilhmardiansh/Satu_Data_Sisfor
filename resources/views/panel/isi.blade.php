@@ -5,8 +5,9 @@
 @section('panel_content')
 <div x-data="{ }">
     <x-panel-head
+        scene="formulir"
         title="Isi Formulir Pengumpulan Data"
-        desc="Formulir aktif bergaya Google Forms yang siap diisi. Respons yang Anda kirim masuk ke fase Pre-processing oleh Wali Data."
+        desc="Pilih formulir aktif untuk mulai mengisi data."
     />
 
     @if($forms->isNotEmpty())

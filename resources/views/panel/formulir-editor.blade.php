@@ -46,14 +46,14 @@
 
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#74D4FF] uppercase">
+                            <span class="text-[10px] font-bold tracking-[0.14em] text-[#74D4FF] uppercase">
                                 STUDIO INSTRUMEN SATU DATA
                             </span>
                             <template x-if="formCode">
-                                <span class="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white" x-text="formCode"></span>
+                                <span class="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white" x-text="formCode"></span>
                             </template>
                             <template x-if="settings.is_quiz">
-                                <span class="rounded bg-emerald-400/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-200" x-text="`KUIS · ${totalPoints()} POIN`"></span>
+                                <span class="rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-emerald-200" x-text="`KUIS · ${totalPoints()} POIN`"></span>
                             </template>
                             <span x-show="hasChanges" class="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200">
                                 Perubahan belum disimpan
@@ -136,16 +136,16 @@
                             @click="activeTab = 'questions'"
                             :class="activeTab === 'questions' ? 'bg-[#0069A8] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'"
                             class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition">
-                        <span class="font-mono text-[10px] opacity-80">01</span>
+                        <span class="text-[10px] opacity-80">01</span>
                         <span>Rancang Instrumen</span>
                     </button>
                     <button type="button"
                             @click="activeTab = 'responses'"
                             :class="activeTab === 'responses' ? 'bg-[#0069A8] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'"
                             class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition">
-                        <span class="font-mono text-[10px] opacity-80">02</span>
+                        <span class="text-[10px] opacity-80">02</span>
                         <span>Analitik Respons</span>
-                        <span class="rounded-md px-1.5 py-0.5 font-mono text-[10px]"
+                        <span class="rounded-md px-1.5 py-0.5 text-[10px] tabular-nums"
                               :class="activeTab === 'responses' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'"
                               x-text="responses.total || 0"></span>
                     </button>
@@ -153,7 +153,7 @@
                             @click="activeTab = 'settings'"
                             :class="activeTab === 'settings' ? 'bg-[#0069A8] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'"
                             class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition">
-                        <span class="font-mono text-[10px] opacity-80">03</span>
+                        <span class="text-[10px] opacity-80">03</span>
                         <span>Konfigurasi &amp; Kuis</span>
                     </button>
                 </div>
@@ -162,7 +162,7 @@
                 <div class="flex flex-wrap items-center gap-2 text-xs">
                     <span class="hidden rounded-lg bg-[#F0F9FF] px-2.5 py-1 font-semibold text-[#0069A8] md:inline-block"
                           x-text="`${meta.target} · ${meta.tahun} (${meta.periode})`"></span>
-                    <span class="hidden rounded-lg px-2.5 py-1 font-mono text-[11px] font-bold sm:inline-block"
+                    <span class="hidden rounded-lg px-2.5 py-1 text-[11px] font-bold sm:inline-block"
                           :class="meta.status_aktif ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-slate-100 text-slate-600'"
                           x-text="meta.status_aktif ? 'Menerima Respons' : 'Ditutup'"></span>
 

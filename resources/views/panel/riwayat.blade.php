@@ -5,12 +5,11 @@
 @section('panel_content')
 <div x-data="{ detail: null }" @keydown.escape.window="detail = null">
     <x-panel-head
-        eyebrow="JEJAK MASUKAN · LOG RESPONS"
         scene="riwayat"
         badge="{{ $submissions->total() }} Entri"
         badgeTone="sky"
         title="Riwayat Pengisian Formulir"
-        :desc="$own ? 'Formulir yang telah Anda kirim beserta status verifikasi pre-processing oleh Wali Data.' : 'Catatan seluruh respons formulir dari Produsen Data beserta status validasi pre-processing.'"
+        :desc="$own ? 'Daftar formulir yang telah Anda isi.' : 'Daftar respons formulir dari Produsen Data.'"
     />
 
     <form method="GET" action="{{ route('panel.riwayat') }}" class="wd-bento mb-5 flex flex-col gap-3 p-3 sm:flex-row">
@@ -44,7 +43,7 @@
     @if($submissions->total() > 0)
         <div class="wd-bento overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="wd-hairline-table min-w-[680px]">
+                <table class="wd-hairline-table min-w-[640px]">
                     <thead>
                         <tr>
                             <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Waktu kirim</th>
@@ -53,7 +52,9 @@
                                 <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Pengirim</th>
                             @endif
                             <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Lampiran</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Status Pre-processing</th>
+                            @if(! $own)
+                                <th class="px-4 py-3 text-left text-[11px] font-bold tracking-wider whitespace-nowrap text-[#475569] uppercase">Status Pre-processing</th>
+                            @endif
                             <th class="px-4 py-3"></th>
                         </tr>
                     </thead>
@@ -87,16 +88,18 @@
                                     'formTitle' => $f?->title ?? $x->code,
                                     'sender' => ($u?->name ?? '-') . ' (' . ($u?->nim ?? '-') . ')',
                                     'submittedAt' => $x->submittedFormatted(),
-                                    'statusLabel' => $x->validationLabel(),
-                                    'note' => $x->catatan_validasi ?? '',
+                                    'statusLabel' => $own ? null : $x->validationLabel(),
+                                    'note' => $own ? '' : ($x->catatan_validasi ?? ''),
                                     'fields' => $detailFields,
                                 ];
                             @endphp
                             <tr class="transition-colors hover:bg-[#F8FAFC]">
-                                <td class="px-4 py-3 font-mono text-xs whitespace-nowrap text-slate-600">{{ $x->submittedFormatted() }}</td>
+                                <td class="px-4 py-3 text-xs tabular-nums whitespace-nowrap text-slate-600">{{ $x->submittedFormatted() }}</td>
                                 <td class="px-4 py-3 text-sm text-slate-600">
                                     <p class="font-bold text-slate-900">{{ $f?->title ?? '(formulir dihapus)' }}</p>
-                                    <p class="text-xs text-[#475569]"><span class="font-mono font-semibold text-[#0069A8]">{{ $x->code }}</span> · {{ $x->sumber_input === 'impor' ? 'Impor GForm' : 'Isian GForm' }}</p>
+                                    @if(! $own)
+                                        <p class="text-xs text-[#475569]"><span class="font-semibold text-[#0069A8]">{{ $x->code }}</span> · {{ $x->sumber_input === 'impor' ? 'Impor' : 'Formulir' }}</p>
+                                    @endif
                                 </td>
                                 @if(! $own)
                                     <td class="px-4 py-3 text-sm text-slate-700">
@@ -114,27 +117,29 @@
                                         -
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 text-sm text-slate-600">
-                                    @if($x->status_validasi === 'valid')
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] px-2 py-0.5 text-[11px] font-bold text-[#047857]">
-                                            <i data-lucide="check-circle-2" class="h-3 w-3" aria-hidden="true"></i>
-                                            Valid · Siap Dataset
-                                        </span>
-                                    @elseif($x->status_validasi === 'ditolak')
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-[#FEF2F2] px-2 py-0.5 text-[11px] font-bold text-[#B91C1C]">
-                                            <i data-lucide="x-circle" class="h-3 w-3" aria-hidden="true"></i>
-                                            Ditolak
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-[#FFFBEB] px-2 py-0.5 text-[11px] font-bold text-[#92400E]">
-                                            <i data-lucide="clock" class="h-3 w-3" aria-hidden="true"></i>
-                                            Menunggu Pre-processing
-                                        </span>
-                                    @endif
-                                    @if($x->catatan_validasi)
-                                        <p class="mt-1 max-w-xs truncate text-xs text-[#475569]" title="{{ $x->catatan_validasi }}">{{ $x->catatan_validasi }}</p>
-                                    @endif
-                                </td>
+                                @if(! $own)
+                                    <td class="px-4 py-3 text-sm text-slate-600">
+                                        @if($x->status_validasi === 'valid')
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] px-2 py-0.5 text-[11px] font-bold text-[#047857]">
+                                                <i data-lucide="check-circle-2" class="h-3 w-3" aria-hidden="true"></i>
+                                                Valid
+                                            </span>
+                                        @elseif($x->status_validasi === 'ditolak')
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-[#FEF2F2] px-2 py-0.5 text-[11px] font-bold text-[#B91C1C]">
+                                                <i data-lucide="x-circle" class="h-3 w-3" aria-hidden="true"></i>
+                                                Ditolak
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-[#FFFBEB] px-2 py-0.5 text-[11px] font-bold text-[#92400E]">
+                                                <i data-lucide="clock" class="h-3 w-3" aria-hidden="true"></i>
+                                                Mentah
+                                            </span>
+                                        @endif
+                                        @if($x->catatan_validasi)
+                                            <p class="mt-1 max-w-xs truncate text-xs text-[#475569]" title="{{ $x->catatan_validasi }}">{{ $x->catatan_validasi }}</p>
+                                        @endif
+                                    </td>
+                                @endif
                                 <td class="px-4 py-3 text-right text-sm text-slate-600">
                                     <button
                                         type="button"
@@ -167,9 +172,14 @@
             <div x-show="detail" role="dialog" aria-modal="true" aria-labelledby="riwayat-detail-title" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
-                        <p class="text-sm text-[#475569]">Riwayat · <span class="font-mono font-bold text-[#0069A8]" x-text="detail?.code || ''"></span> · <span class="font-semibold" x-text="detail?.statusLabel || ''"></span></p>
+                        <p class="text-sm text-[#475569]">
+                            Riwayat · <span class="font-bold text-[#0069A8]" x-text="detail?.code || ''"></span>
+                            <template x-if="detail?.statusLabel">
+                                <span> · <span class="font-semibold" x-text="detail.statusLabel"></span></span>
+                            </template>
+                        </p>
                         <h2 id="riwayat-detail-title" class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl" x-text="detail?.formTitle || ''"></h2>
-                        <p class="mt-1 text-sm text-[#475569]" x-text="detail ? `Dikirim oleh ${detail.sender} pada ${detail.submittedAt}` : ''"></p>
+                        <p class="mt-1 text-sm text-[#475569]" x-text="detail ? `Dikirim pada ${detail.submittedAt}` : ''"></p>
                     </div>
                     <button type="button" @click="detail = null" aria-label="Tutup" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-[#0069A8] hover:text-[#0069A8]">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -178,7 +188,7 @@
 
                 <div class="overflow-y-auto px-5 py-4 sm:px-8">
                     <template x-if="detail?.note">
-                        <div class="mb-3 rounded-xl border border-amber-200 bg-[#FFFBEB] px-4 py-3 text-xs font-medium text-[#92400E]" x-text="'Catatan Pre-processing: ' + detail.note"></div>
+                        <div class="mb-3 rounded-xl border border-amber-200 bg-[#FFFBEB] px-4 py-3 text-xs font-medium text-[#92400E]" x-text="'Catatan: ' + detail.note"></div>
                     </template>
 
                     <dl class="divide-y divide-slate-100">

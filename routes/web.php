@@ -108,6 +108,7 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
             ->name('kategori.destroy');
 
         Route::get('/dataset', [ManageDatasetController::class, 'index'])->name('dataset');
+        Route::get('/dataset/buat', [ManageDatasetController::class, 'create'])->name('dataset.create');
         Route::post('/dataset/from-form', [ManageDatasetController::class, 'storeFromForm'])->name('dataset.from-form');
         Route::patch('/dataset/{dataset:code}/access', [ManageDatasetController::class, 'toggleAccess'])->name('dataset.access');
         Route::patch('/dataset/{dataset:code}/publish', [ManageDatasetController::class, 'togglePublish'])->name('dataset.publish');

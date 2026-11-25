@@ -2,7 +2,7 @@
     <!-- Card 1: Tata Kelola & Pengumpulan Respons -->
     <section class="wd-bento space-y-4 p-6 text-xs">
         <div class="border-b border-slate-100 pb-3">
-            <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Tata Kelola</p>
+            <p class="text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Tata Kelola</p>
             <h2 class="mt-0.5 text-base font-extrabold text-slate-900">Pengumpulan Data &amp; Batas Akses</h2>
         </div>
 
@@ -48,7 +48,7 @@
     <section class="wd-bento space-y-4 p-6 text-xs">
         <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
             <div>
-                <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#047857] uppercase">Evaluasi &amp; Skor</p>
+                <p class="text-[10px] font-bold tracking-[0.14em] text-[#047857] uppercase">Evaluasi &amp; Skor</p>
                 <h2 class="mt-0.5 text-base font-extrabold text-slate-900">Mode Kuis Otomatis</h2>
             </div>
             <input type="checkbox" x-model="settings.is_quiz" class="h-5 w-5 accent-[#047857]" />
@@ -88,7 +88,7 @@
 
             <label class="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
                 <span class="font-bold text-slate-800">Nilai poin default pertanyaan baru</span>
-                <input type="number" min="0" max="100" x-model.number="settings.default_points" class="h-9 w-24 rounded-xl border border-slate-200 px-3 text-center font-mono font-bold" />
+                <input type="number" min="0" max="100" x-model.number="settings.default_points" class="h-9 w-24 rounded-xl border border-slate-200 px-3 text-center font-bold tabular-nums" />
             </label>
         </div>
     </section>
@@ -96,7 +96,7 @@
     <!-- Card 3: Presentasi & Default Pertanyaan -->
     <section class="wd-bento space-y-4 p-6 text-xs">
         <div class="border-b border-slate-100 pb-3">
-            <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Pengalaman Responden</p>
+            <p class="text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Pengalaman Responden</p>
             <h2 class="mt-0.5 text-base font-extrabold text-slate-900">Presentasi &amp; Default</h2>
         </div>
 
@@ -130,7 +130,7 @@
     <section class="wd-bento space-y-4 p-6 text-xs">
         <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-                <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Identitas Visual</p>
+                <p class="text-[10px] font-bold tracking-[0.14em] text-[#0069A8] uppercase">Identitas Visual</p>
                 <h2 class="mt-0.5 text-base font-extrabold text-slate-900">Tema &amp; Tipografi UNUSA</h2>
             </div>
             <button type="button" @click="themeDrawerOpen = true" class="rounded-lg bg-[#F0F9FF] px-3 py-1.5 font-bold text-[#0069A8] hover:bg-[#E0F2FE]">Panel Tema Lengkap</button>

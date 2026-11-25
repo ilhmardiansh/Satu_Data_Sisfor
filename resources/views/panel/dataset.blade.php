@@ -5,38 +5,22 @@
 @section('panel_content')
 @php
     $isAdmin = auth()->user()->isAdmin();
-    $pageTotal = $datasets->total();
-    $pagePublished = $datasets->getCollection()->filter(fn ($d) => $d->isPublished())->count();
-    $pagePublic = $datasets->getCollection()->filter(fn ($d) => $d->access === 'public')->count();
 @endphp
 
 <div x-data="manageDatasetManager()">
     <x-panel-head
-        eyebrow="TAHAP 04 · KATALOG &amp; TATA KELOLA"
         scene="dataset"
-        badge="{{ $pageTotal }} Dataset"
+        badge="{{ $datasets->total() }} Dataset"
         badgeTone="emerald"
         title="Kelola Dataset"
-        desc="Susun dataset dari formulir yang telah lulus fase Pre-processing, atur status Draft/Terpublikasi dan akses Publik/Private."
+        desc="Susun, publikasikan, dan atur akses dataset resmi Program Studi."
     >
-        <button type="button"
-                @click="openBuilder()"
-                {{ empty($builderFormsPayload) ? 'disabled' : '' }}
-                class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2.5 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8] disabled:cursor-not-allowed disabled:opacity-45">
+        <a href="{{ route('panel.dataset.create') }}"
+           class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2.5 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8]">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
-            Buat dataset dari formulir
-        </button>
+            Buat dataset
+        </a>
     </x-panel-head>
-
-    <!-- Compact Inline Telemetry Strip -->
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 px-1 text-xs font-medium text-[#475569]">
-        <div class="flex flex-wrap items-center gap-4">
-            <span>Total katalog: <strong class="font-mono text-slate-900">{{ $pageTotal }}</strong></span>
-            <span>Terbit (halaman ini): <strong class="font-mono text-[#0069A8]">{{ $pagePublished }}</strong></span>
-            <span>Akses publik (halaman ini): <strong class="font-mono text-[#047857]">{{ $pagePublic }}</strong></span>
-        </div>
-        <span class="font-mono text-[11px] text-slate-500">Sinkronisasi ulang otomatis memvalidasi status Pre-processing sumber</span>
-    </div>
 
     <form method="GET" action="{{ route('panel.dataset') }}" class="wd-bento mb-5 flex flex-wrap items-center gap-2 p-3">
         <label class="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 focus-within:border-[#0069A8] focus-within:bg-white">
@@ -91,19 +75,19 @@
                         <tr class="transition-colors hover:bg-[#F8FAFC]">
                             <td class="px-4 py-3.5 text-sm text-slate-600">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#0069A8]">{{ $d->code }}</span>
+                                    <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-[#0069A8]">{{ $d->code }}</span>
                                     @if($d->sourceForm)
                                         <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700">Dari {{ $d->sourceForm->code }}</span>
                                     @endif
                                 </div>
                                 <p class="mt-1 font-bold text-slate-900">{{ $d->title }}</p>
                                 <p class="text-xs text-[#475569]">
-                                    {{ $d->category?->name }} · {{ $d->format }} · diperbarui {{ $d->updated_label ?? ($d->updated_at?->locale('id')->translatedFormat('j M Y') ?? '-') }}
+                                    {{ $d->category?->name }} · {{ $d->format }} · {{ $d->updated_label ?? ($d->updated_at?->locale('id')->translatedFormat('j M Y') ?? '-') }}
                                 </p>
                             </td>
                             <td class="px-4 py-3.5 text-sm whitespace-nowrap text-slate-700">
                                 <p class="font-semibold">{{ $d->tahun }} · {{ $d->periode }}</p>
-                                <p class="font-mono text-xs tabular-nums text-[#475569]">{{ count($d->rows ?? []) }} baris · {{ count($d->cols ?? []) }} kolom</p>
+                                <p class="text-xs tabular-nums text-[#475569]">{{ count($d->rows ?? []) }} baris · {{ count($d->cols ?? []) }} kolom</p>
                             </td>
                             <td class="px-4 py-3.5 text-sm text-slate-600">
                                 <div class="flex items-center gap-2" x-data="{ published: @js($d->isPublished()), busy: false }">
@@ -178,7 +162,7 @@
                                             @csrf
                                             <button type="submit"
                                                     class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-[#0069A8] hover:text-[#0069A8]"
-                                                    title="Sinkronkan ulang dari formulir sumber"
+                                                    title="Sinkronkan ulang"
                                                     aria-label="Sinkronkan ulang">
                                                 <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
                                             </button>
@@ -218,7 +202,15 @@
                                     <i data-lucide="table-2" class="h-6 w-6" aria-hidden="true"></i>
                                 </span>
                                 <p class="mt-3 text-sm font-bold text-slate-800">Belum ada dataset tersedia</p>
-                                <p class="mt-1 text-xs text-[#475569]">Buat formulir pengumpulan data, selesaikan fase Pre-processing, lalu susun dataset dari formulir tersebut.</p>
+                                <p class="mt-1 text-xs text-[#475569]">
+                                    {{ $readyFormsCount > 0 ? 'Terdapat '.$readyFormsCount.' formulir siap dikemas menjadi dataset.' : 'Tutup formulir, selesaikan Pre-processing Data, lalu buat dataset baru.' }}
+                                </p>
+                                @if($readyFormsCount > 0)
+                                    <a href="{{ route('panel.dataset.create') }}"
+                                       class="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-[#0069A8] px-4 py-2 text-xs font-semibold text-white hover:bg-[#005187]">
+                                        Buat dataset
+                                    </a>
+                                @endif
                             </td>
                         </tr>
                     @endforelse
@@ -287,7 +279,7 @@
             <div role="dialog" aria-modal="true" aria-labelledby="panel-dataset-edit-title" class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
-                        <p class="text-sm font-mono font-semibold text-[#475569]" x-text="editTarget.code"></p>
+                        <p class="text-sm font-semibold text-[#475569]" x-text="editTarget.code"></p>
                         <h2 id="panel-dataset-edit-title" class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">Ubah dataset</h2>
                     </div>
                     <button type="button" @click="editOpen = false" aria-label="Tutup" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-[#0069a8] hover:text-[#0069a8]">
@@ -362,17 +354,13 @@
             </div>
         </div>
     </template>
-
-    @include('panel.partials.dataset-builder-modal')
 </div>
 @endsection
 
 @push('scripts')
-@include('panel.partials.dataset-builder-script')
 <script>
 function manageDatasetManager() {
     return {
-        ...datasetBuilderMixin(@json($builderFormsPayload)),
         previewOpen: false,
         previewData: null,
         editOpen: false,

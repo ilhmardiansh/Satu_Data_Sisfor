@@ -13,7 +13,7 @@
     $headerImage = (string) ($theme['header_image'] ?? '');
     $fontFamily = (string) ($theme['font_family'] ?? 'jakarta');
     $fontStyle = match ($fontFamily) {
-        'mono' => 'font-family: var(--font-mono);',
+        'mono' => "font-family: 'Plus Jakarta Sans', var(--font-sans);",
         'serif' => 'font-family: Georgia, Cambria, "Times New Roman", serif;',
         default => '',
     };
@@ -165,14 +165,32 @@
             <div>
                 <a href="{{ route('pengisian-data') }}" class="font-semibold hover:text-[#0069A8]">Portal Pengisian Data</a>
                 <span class="mx-1.5">/</span>
-                <span class="font-mono font-semibold text-[#0069A8]">{{ $dataForm->code }}</span>
+                <span class="font-semibold tabular-nums text-[#0069A8]">{{ $dataForm->code }}</span>
             </div>
-            @auth
+            @if($user && ! $user->isWali())
                 <a href="{{ route('panel.riwayat') }}" class="text-xs font-bold text-[#0069A8] hover:underline">Riwayat pengisian saya</a>
-            @endauth
+            @endif
         </nav>
 
-        <!-- UNUSA Architectural Hero Header Band -->
+        @if($user && $user->isWali())
+            <div role="alert" class="rounded-2xl border border-amber-200 bg-amber-50/90 p-6 sm:p-8">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="flex items-start gap-3.5">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-800">
+                            <i data-lucide="alert-triangle" class="h-5 w-5" aria-hidden="true"></i>
+                        </span>
+                        <div>
+                            <h1 class="text-lg font-extrabold tracking-tight text-slate-900">{{ $dataForm->judul }}</h1>
+                            <p class="mt-1.5 text-sm font-semibold text-amber-900">Wali Data tidak diperkenankan mengisi data.</p>
+                        </div>
+                    </div>
+                    <a href="{{ route('pengisian-data') }}" class="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-800 hover:border-[#0069A8] hover:text-[#0069A8]">
+                        Kembali
+                    </a>
+                </div>
+            </div>
+        @else
+            <!-- UNUSA Architectural Hero Header Band -->
         <section class="relative isolate overflow-hidden rounded-3xl border border-slate-200/80 text-white shadow-sm">
             @if($headerImage !== '')
                 <img src="{{ $headerImage }}" alt="{{ $dataForm->title }}" class="absolute inset-0 -z-20 h-full w-full object-cover" />
@@ -183,11 +201,11 @@
 
             <div class="p-6 sm:p-9">
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-mono text-[11px] font-bold text-[#74D4FF]">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold text-[#74D4FF]">
                         <span class="h-1.5 w-1.5 rounded-full bg-[#38BDF8]"></span>
                         {{ $dataForm->category?->nama_kategori ?? 'Umum' }}
                     </span>
-                    <span class="rounded-full bg-white/15 px-3 py-1 font-mono text-[11px] font-semibold text-white">{{ $dataForm->code }}</span>
+                    <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold tabular-nums text-white">{{ $dataForm->code }}</span>
                     <span class="rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-200">{{ $dataForm->tahun }} · Semester {{ $dataForm->periode }} · Sasaran: {{ $dataForm->target }}</span>
                     @if($dataForm->batasi_satu_respon)
                         <span class="rounded-full bg-amber-400/20 px-3 py-1 text-[11px] font-bold text-amber-200">Maks 1x per akun</span>
@@ -210,9 +228,9 @@
                         <i data-lucide="calendar-clock" class="h-4 w-4" aria-hidden="true"></i>
                         Tenggat {{ $dataForm->deadlineFormatted() }} ({{ $dataForm->timeLeftLabel() }})
                     </span>
-                    <span class="font-mono">{{ count($fields) }} pertanyaan</span>
+                    <span class="tabular-nums">{{ count($fields) }} pertanyaan</span>
                     @if(count($sections) > 1)
-                        <span class="font-mono">{{ count($sections) }} bagian</span>
+                        <span class="tabular-nums">{{ count($sections) }} bagian</span>
                     @endif
                     @if($alreadySubmittedCount > 0)
                         <span class="inline-flex items-center gap-1 font-semibold text-emerald-300">
@@ -229,8 +247,6 @@
                 <p class="text-base font-extrabold">{{ session('success') }}</p>
                 @if(session('custom_confirmation'))
                     <p class="mt-1.5 text-sm text-slate-800">{{ session('custom_confirmation') }}</p>
-                @else
-                    <p class="mt-1 text-xs text-slate-700">Setelah masuk fase Pre-processing dan dinyatakan valid oleh Wali Data, data siap dikemas menjadi dataset resmi prodi.</p>
                 @endif
 
                 @if(! $dataForm->batasi_satu_respon && ! empty($settings['show_another_response_link']))
@@ -244,9 +260,9 @@
         @if(session('quiz_result'))
             @php $qr = session('quiz_result'); @endphp
             <section class="wd-bento mt-5 border-t-4 border-t-[#047857] p-6">
-                <p class="font-mono text-[11px] font-bold tracking-wider text-[#047857] uppercase">Hasil Penilaian Kuis Otomatis</p>
+                <p class="text-[11px] font-bold tracking-wider text-[#047857] uppercase">Hasil Penilaian Kuis Otomatis</p>
                 <h2 class="mt-1 text-xl font-extrabold text-slate-900">
-                    Skor Anda: <span class="font-mono text-[#047857]">{{ $qr['earned'] ?? 0 }} / {{ $qr['possible'] ?? 0 }}</span> ({{ $qr['pct'] ?? 0 }}%)
+                    Skor Anda: <span class="tabular-nums text-[#047857]">{{ $qr['earned'] ?? 0 }} / {{ $qr['possible'] ?? 0 }}</span> ({{ $qr['pct'] ?? 0 }}%)
                 </h2>
 
                 @if(! empty($qr['breakdown']))
@@ -256,7 +272,7 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <p class="font-bold text-slate-900">{{ $b['label'] }}</p>
                                     @if(! empty($qr['show_points']))
-                                        <span class="shrink-0 font-mono font-bold {{ $b['is_correct'] ? 'text-[#047857]' : 'text-[#B91C1C]' }}">
+                                        <span class="shrink-0 font-bold tabular-nums {{ $b['is_correct'] ? 'text-[#047857]' : 'text-[#B91C1C]' }}">
                                             {{ $b['points_earned'] }}/{{ $b['points_possible'] }} poin
                                         </span>
                                     @endif
@@ -289,17 +305,17 @@
                 @if($settings['collect_identity'] ?? true)
                     <section class="wd-bento overflow-hidden">
                         <div class="bg-[#182654] px-4 py-3 text-white">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Identitas Responden</p>
+                            <p class="text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Identitas Responden</p>
                         </div>
                         <div class="p-4 text-xs">
                             @if($user)
                                 <div class="flex items-center gap-3">
-                                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F0F9FF] font-mono text-xs font-extrabold text-[#0069A8]">
+                                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F0F9FF] text-xs font-extrabold tabular-nums text-[#0069A8]">
                                         {{ $user->initials() }}
                                     </span>
                                     <div class="min-w-0">
                                         <p class="truncate font-extrabold text-slate-900">{{ $user->name }}</p>
-                                        <p class="font-mono text-[11px] text-[#475569]">{{ $user->nim }}</p>
+                                        <p class="text-[11px] tabular-nums text-[#475569]">{{ $user->nim }}</p>
                                     </div>
                                 </div>
                                 <div class="mt-3 flex flex-wrap gap-1.5">
@@ -323,8 +339,8 @@
                 @if(count($sections) > 1)
                     <section class="wd-bento p-4 text-xs">
                         <div class="flex items-center justify-between">
-                            <p class="font-mono text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Progres Bagian</p>
-                            <span class="font-mono font-bold text-slate-700" x-text="`${currentSectionIdx + 1}/${totalSections()}`"></span>
+                            <p class="text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Progres Bagian</p>
+                            <span class="font-bold tabular-nums text-slate-700" x-text="`${currentSectionIdx + 1}/${totalSections()}`"></span>
                         </div>
                         @if(! empty($settings['show_progress_bar']))
                             <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
@@ -335,7 +351,7 @@
                             @foreach($sections as $sIdx => $sec)
                                 <li class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition"
                                     :class="currentSectionIdx === {{ $sIdx }} ? 'bg-[#F0F9FF] font-bold text-[#0069A8]' : 'text-slate-600'">
-                                    <span class="grid h-5 w-5 shrink-0 place-items-center rounded-md font-mono text-[10px] font-extrabold"
+                                    <span class="grid h-5 w-5 shrink-0 place-items-center rounded-md text-[10px] font-extrabold tabular-nums"
                                           :class="currentSectionIdx === {{ $sIdx }} ? 'bg-[#0069A8] text-white' : 'bg-slate-100 text-slate-600'">
                                         {{ $sIdx + 1 }}
                                     </span>
@@ -346,15 +362,6 @@
                     </section>
                 @endif
 
-                <div class="wd-bento p-4 text-[11px] leading-relaxed text-[#475569]">
-                    <p class="font-mono text-[10px] font-bold tracking-wider text-[#182654] uppercase">Alur Satu Data</p>
-                    <p class="mt-1">Respons Anda masuk ke antrean <strong class="text-slate-800">Pre-processing Wali Data</strong> sebelum dikemas menjadi dataset resmi Prodi Sistem Informasi.</p>
-                    @if($canSubmit)
-                        <button type="button" @click="clearForm($refs.runnerForm)" class="mt-3 font-bold text-[#0069A8] hover:underline">
-                            Kosongkan seluruh isian
-                        </button>
-                    @endif
-                </div>
             </aside>
 
             <!-- Right Editorial Document Area -->
@@ -398,7 +405,7 @@
 
                                 @if(count($sections) > 1 && ($sIdx > 0 || $section['id'] !== '__start__'))
                                     <div class="border-b border-slate-200 bg-[#F8FAFC] px-6 py-4">
-                                        <p class="font-mono text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Bagian {{ $sIdx + 1 }} dari {{ count($sections) }}</p>
+                                        <p class="text-[10px] font-bold tracking-wider text-[#0069A8] uppercase">Bagian {{ $sIdx + 1 }} dari {{ count($sections) }}</p>
                                         <h2 class="mt-0.5 text-lg font-extrabold text-[#182654]">{{ $section['title'] }}</h2>
                                         @if($section['description'] !== '')
                                             <p class="mt-1 whitespace-pre-line text-xs text-[#475569]">{{ $section['description'] }}</p>
@@ -471,7 +478,7 @@
                                                 <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
                                                     <div class="min-w-0 flex-1">
                                                         <label for="fld_{{ $fid }}" class="flex items-start gap-2.5 font-bold text-slate-900" style="font-size: {{ (int) ($theme['question_size'] ?? 15) }}px;">
-                                                            <span class="mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-[#F0F9FF] px-1.5 font-mono text-[11px] font-extrabold text-[#0069A8]">{{ str_pad((string) $questionCounter, 2, '0', STR_PAD_LEFT) }}</span>
+                                                            <span class="mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-[#F0F9FF] px-1.5 text-[11px] font-extrabold tabular-nums text-[#0069A8]">{{ str_pad((string) $questionCounter, 2, '0', STR_PAD_LEFT) }}</span>
                                                             <span>
                                                                 {{ $fld['label'] }}
                                                                 @if($req)
@@ -484,7 +491,7 @@
                                                         @endif
                                                     </div>
                                                     @if(! empty($settings['is_quiz']) && ! empty($cfg['points']) && ! empty($settings['quiz_show_points']))
-                                                        <span class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-600">{{ (int) $cfg['points'] }} poin</span>
+                                                        <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-600">{{ (int) $cfg['points'] }} poin</span>
                                                     @endif
                                                 </div>
 
@@ -602,7 +609,7 @@
                                                                     @for($n = $sMin; $n <= $sMax; $n++)
                                                                         <label class="flex cursor-pointer flex-col items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 transition hover:border-[#0069A8]"
                                                                                :class="String(answers['{{ $fid }}'] ?? '') === '{{ $n }}' ? 'border-[#0069A8] bg-[#F0F9FF] text-[#0069A8]' : 'text-slate-700'">
-                                                                            <span class="font-mono text-xs font-bold">{{ $n }}</span>
+                                                                            <span class="text-xs font-bold tabular-nums">{{ $n }}</span>
                                                                             <input type="radio"
                                                                                    name="values[{{ $fid }}]"
                                                                                    value="{{ $n }}"
@@ -635,7 +642,7 @@
                                                                            class="sr-only" />
                                                                     <span class="text-xl transition"
                                                                           :class="Number(answers['{{ $fid }}'] || 0) >= {{ $n }} ? 'text-[#0069A8]' : 'text-slate-300'">{{ $glyph }}</span>
-                                                                    <span class="font-mono text-[10px] font-bold text-slate-600">{{ $n }}</span>
+                                                                    <span class="text-[10px] font-bold tabular-nums text-slate-600">{{ $n }}</span>
                                                                 </label>
                                                             @endfor
                                                         </div>
@@ -729,7 +736,7 @@
                                                             <div x-show="uploadingFields['{{ $fid }}']" x-cloak class="space-y-1">
                                                                 <div class="flex items-center justify-between text-[11px] font-bold text-[#0069A8]">
                                                                     <span>Mengunggah berkas secara bertahap...</span>
-                                                                    <span class="font-mono" x-text="`${uploadProgress['{{ $fid }}'] || 0}%`"></span>
+                                                                    <span class="tabular-nums" x-text="`${uploadProgress['{{ $fid }}'] || 0}%`"></span>
                                                                 </div>
                                                                 <div class="h-1.5 overflow-hidden rounded-full bg-slate-200">
                                                                     <div class="h-full rounded-full bg-[#0069A8] transition-all" :style="`width: ${uploadProgress['{{ $fid }}'] || 0}%`"></div>
@@ -767,7 +774,7 @@
                                                                    name="values[{{ $fid }}]"
                                                                    value="{{ is_string($oldVal) ? $oldVal : '' }}"
                                                                    placeholder="JJ:MM:DD (contoh: 01:30:00)"
-                                                                   class="min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 font-mono text-sm text-slate-900 outline-none focus:border-[#0069A8] focus:ring-4 focus:ring-sky-100" />
+                                                                   class="min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm tabular-nums text-slate-900 outline-none focus:border-[#0069A8] focus:ring-4 focus:ring-sky-100" />
                                                         @else
                                                             <input id="fld_{{ $fid }}"
                                                                    type="time"
@@ -799,7 +806,14 @@
 
                         <!-- Submit & Section Navigation Bar -->
                         <div class="wd-bento flex flex-wrap items-center justify-between gap-3 px-6 py-4">
-                            <p class="text-xs text-[#475569]">Kolom bertanda <span class="font-bold text-[#B91C1C]">*</span> wajib diisi.</p>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <p class="text-xs text-[#475569]">Kolom bertanda <span class="font-bold text-[#B91C1C]">*</span> wajib diisi.</p>
+                                @if($canSubmit)
+                                    <button type="button" @click="clearForm($refs.runnerForm)" class="text-xs font-bold text-[#0069A8] hover:underline">
+                                        Kosongkan isian
+                                    </button>
+                                @endif
+                            </div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <button type="button"
                                         x-show="currentSectionIdx > 0"
@@ -831,6 +845,7 @@
                 @endif
             </div>
         </div>
+        @endif
     </div>
 </main>
 @endsection

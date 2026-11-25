@@ -20,10 +20,11 @@
 
 <div x-data="userManager()">
     <x-panel-head
+        scene="kategori"
         title="Pengguna & Peran"
         desc="Kelola akun produsen data, wali data, dan administrator portal."
     >
-        <button type="button" @click="openNew()" class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 motion-safe:active:scale-[0.97]">
+        <button type="button" @click="openNew()" class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2.5 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8] motion-safe:active:scale-[0.97]">
             <i data-lucide="user-plus" class="h-4 w-4"></i>
             Tambah pengguna
         </button>
@@ -90,11 +91,11 @@
                                                 <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Anda</span>
                                             @endif
                                         </p>
-                                        <p class="font-mono text-[11px] text-slate-500">{{ $u->code }}</p>
+                                        <p class="text-[11px] tabular-nums text-slate-500">{{ $u->code }}</p>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ $u->nim }}</td>
+                            <td class="px-4 py-3 text-xs tabular-nums text-slate-700">{{ $u->nim }}</td>
                             <td class="px-4 py-3 text-sm">
                                 <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold {{ $roleBadgeClass($u->role) }}">
                                     {{ $u->roleLabel() }}

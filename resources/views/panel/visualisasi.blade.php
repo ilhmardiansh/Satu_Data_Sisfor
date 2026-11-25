@@ -10,12 +10,11 @@
 
 <div x-data="vizManager()">
     <x-panel-head
-        eyebrow="TAHAP 05 · ANALITIKA PUBLIK"
         scene="visualisasi"
         badge="{{ $shownCount }}/{{ count($vizPayload) }} Tampil"
         badgeTone="sky"
         title="Visualisasi Dashboard"
-        desc="Bangun grafik interaktif dari dataset bernumerik yang telah tersusun. Pengunjung dapat mengubah kolom dan tipe grafik langsung di Dashboard."
+        desc="Buat grafik interaktif dari dataset yang telah terbit."
     >
         <button type="button"
                 @click="openNew()"
@@ -71,7 +70,7 @@
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#0069A8]">{{ $v['code'] }}</span>
+                                <span class="rounded bg-[#F0F9FF] px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[#0069A8]">{{ $v['code'] }}</span>
                                 @if(! ($v['datasetPublished'] ?? true))
                                     <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">Sumber Draft</span>
                                 @elseif(($v['datasetAccess'] ?? 'public') === 'private')
@@ -168,7 +167,7 @@
             <div role="dialog" aria-modal="true" aria-labelledby="panel-viz-modal-title" class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#F8FAFC] px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
                     <div class="min-w-0">
-                        <p class="font-mono text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Visualisasi dashboard</p>
+                        <p class="text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Visualisasi dashboard</p>
                         <h2 id="panel-viz-modal-title" class="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl" x-text="isEdit ? 'Ubah visualisasi' : 'Buat visualisasi'"></h2>
                         <p class="mt-1 text-sm text-[#475569]">Pilih data yang ingin ditampilkan di Dashboard dalam bentuk angka atau grafik.</p>
                     </div>

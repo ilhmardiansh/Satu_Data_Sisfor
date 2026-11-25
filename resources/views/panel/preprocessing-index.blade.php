@@ -5,12 +5,11 @@
 @section('panel_content')
 <div>
     <x-panel-head
-        eyebrow="TAHAP 03 · KURASI & PEMBERSIHAN WAJIB"
         scene="preprocessing"
         :badge="$summary['needs_attention'] > 0 ? $summary['needs_attention'].' Perlu Antrean' : 'Semua Terkendali'"
         :badgeTone="$summary['needs_attention'] > 0 ? 'amber' : 'emerald'"
         title="Pilih Formulir Pre-processing"
-        desc="Cari dan pilih instrumen formulir yang akan dibersihkan. Halaman direktori ini memudahkan pencarian ketika instrumen berjumlah puluhan atau ratusan."
+        desc="Hanya formulir yang sudah ditutup atau melewati tenggat waktu."
     >
         <a href="{{ route('panel.formulir') }}" class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20">
             <i data-lucide="clipboard-list" class="h-4 w-4" aria-hidden="true"></i>
@@ -43,7 +42,7 @@
                class="wd-bento-interactive flex items-center justify-between gap-3 p-4 {{ $isActive ? 'border-[#0069A8] ring-2 ring-[#00A6F4]/35' : '' }}">
                 <div class="min-w-0">
                     <p class="truncate text-xs font-semibold text-[#475569]">{{ $stLabel }}</p>
-                    <p class="mt-1 font-mono text-2xl font-extrabold tabular-nums text-slate-900">{{ $stCount }}</p>
+                    <p class="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{{ $stCount }}</p>
                 </div>
                 <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl {{ $stBg }} {{ $stText }}">
                     <i data-lucide="{{ $stIcon }}" class="h-5 w-5" aria-hidden="true"></i>
@@ -108,9 +107,6 @@
             </div>
         </div>
 
-        <p class="mt-3 text-xs text-[#475569]">
-            Menampilkan <strong class="font-mono text-slate-900">{{ $formsPaginator->total() }}</strong> instrumen formulir. Klik kartu untuk membuka ruang kerja pembersihan data &amp; normalisasi.
-        </p>
     </form>
 
     <!-- Direktori Kartu Formulir -->
@@ -127,9 +123,9 @@
                     <div>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="rounded-md bg-[#F0F9FF] px-2.5 py-1 font-mono text-xs font-extrabold text-[#0069A8]">{{ $f->code }}</span>
+                                <span class="rounded-md bg-[#F0F9FF] px-2.5 py-1 text-xs font-extrabold tabular-nums text-[#0069A8]">{{ $f->code }}</span>
                                 <span class="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{{ $f->category?->name ?? 'Umum' }}</span>
-                                <span class="rounded-md bg-slate-50 px-2 py-1 font-mono text-[11px] font-medium text-[#475569]">{{ $f->tahun }} · {{ $f->periode }}</span>
+                                <span class="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-medium tabular-nums text-[#475569]">{{ $f->tahun }} · {{ $f->periode }}</span>
                             </div>
 
                             @if($isReady)
@@ -155,18 +151,10 @@
                             </a>
                         </h2>
 
-                        @if($f->description)
-                            <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-[#475569]">{{ $f->description }}</p>
-                        @endif
-
-                        <div class="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-[#475569]">
+                        <div class="mt-2.5 flex flex-wrap items-center gap-2.5 text-xs text-[#475569]">
                             <span>Sasaran: <strong class="text-slate-800">{{ $f->target }}</strong></span>
                             <span>&middot;</span>
-                            <span>{{ count($f->fields ?? []) }} kolom pertanyaan</span>
-                            <span>&middot;</span>
-                            <span class="{{ $f->isOpen() ? 'font-semibold text-[#0069A8]' : 'text-slate-500' }}">
-                                {{ $f->isOpen() ? 'Formulir Terbuka' : 'Formulir Ditutup' }}
-                            </span>
+                            <span class="tabular-nums">{{ count($f->fields ?? []) }} pertanyaan</span>
                         </div>
                     </div>
 
@@ -174,33 +162,21 @@
                         <div class="grid grid-cols-4 gap-2 text-center">
                             <div class="rounded-xl bg-[#F8FAFC] px-2 py-2">
                                 <span class="block text-[10px] font-semibold text-[#475569]">Total</span>
-                                <span class="font-mono text-sm font-extrabold tabular-nums text-slate-900">{{ $f->submissions_count }}</span>
+                                <span class="text-sm font-extrabold tabular-nums text-slate-900">{{ $f->submissions_count }}</span>
                             </div>
                             <div class="rounded-xl bg-[#FFFBEB]/70 px-2 py-2">
                                 <span class="block text-[10px] font-semibold text-[#92400E]">Mentah</span>
-                                <span class="font-mono text-sm font-extrabold tabular-nums text-[#92400E]">{{ $f->raw_submissions_count }}</span>
+                                <span class="text-sm font-extrabold tabular-nums text-[#92400E]">{{ $f->raw_submissions_count }}</span>
                             </div>
                             <div class="rounded-xl bg-[#ECFDF5]/70 px-2 py-2">
                                 <span class="block text-[10px] font-semibold text-[#047857]">Valid</span>
-                                <span class="font-mono text-sm font-extrabold tabular-nums text-[#047857]">{{ $f->valid_submissions_count }}</span>
+                                <span class="text-sm font-extrabold tabular-nums text-[#047857]">{{ $f->valid_submissions_count }}</span>
                             </div>
                             <div class="rounded-xl bg-slate-100/70 px-2 py-2">
                                 <span class="block text-[10px] font-semibold text-slate-600">Ditolak</span>
-                                <span class="font-mono text-sm font-extrabold tabular-nums text-slate-700">{{ $f->rejected_submissions_count }}</span>
+                                <span class="text-sm font-extrabold tabular-nums text-slate-700">{{ $f->rejected_submissions_count }}</span>
                             </div>
                         </div>
-
-                        @if($f->submissions_count > 0)
-                            <div>
-                                <div class="mb-1 flex items-center justify-between text-[11px] text-[#475569]">
-                                    <span>Kesiapan baris aktif</span>
-                                    <span class="font-mono font-bold text-slate-800">{{ $validPct }}% valid</span>
-                                </div>
-                                <div class="h-1.5 overflow-hidden rounded-full bg-slate-200">
-                                    <div class="h-full rounded-full {{ $isReady ? 'bg-[#047857]' : 'bg-[#0069A8]' }}" style="width: {{ $validPct }}%"></div>
-                                </div>
-                            </div>
-                        @endif
 
                         <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
                             <span class="text-[11px] text-[#475569]">
@@ -234,6 +210,12 @@
                 <p class="mt-1 text-xs text-[#475569]">Coba ubah kata kunci atau reset filter direktori formulir.</p>
                 <a href="{{ route('panel.preprocessing') }}" class="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-[#0069A8] px-4 py-2 text-xs font-bold text-white hover:bg-[#182654]">
                     Tampilkan semua formulir
+                </a>
+            @elseif(($openFormsCount ?? 0) > 0)
+                <p class="mt-4 font-bold text-slate-800">Belum ada formulir yang ditutup</p>
+                <p class="mt-1 text-xs text-[#475569]">Tutup formulir di menu Instrumen Formulir atau tunggu tenggat waktu berakhir sebelum melakukan Pre-processing.</p>
+                <a href="{{ route('panel.formulir') }}" class="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-[#0069A8] px-4 py-2 text-xs font-bold text-white hover:bg-[#182654]">
+                    Kelola formulir
                 </a>
             @else
                 <p class="mt-4 font-bold text-slate-800">Belum ada instrumen formulir</p>

@@ -3,20 +3,20 @@
     <section class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div class="wd-bento grid grid-cols-2 divide-x divide-y divide-slate-100 overflow-hidden sm:grid-cols-4 sm:divide-y-0">
             <div class="p-4">
-                <p class="font-mono text-[10px] font-bold tracking-wider text-[#475569] uppercase">Total Respons</p>
-                <p class="mt-1 font-mono text-2xl font-extrabold text-[#182654]" x-text="responses.total || 0"></p>
+                <p class="text-[10px] font-bold tracking-wider text-[#475569] uppercase">Total Respons</p>
+                <p class="mt-1 text-2xl font-extrabold tabular-nums text-[#182654]" x-text="responses.total || 0"></p>
             </div>
             <div class="p-4">
-                <p class="font-mono text-[10px] font-bold tracking-wider text-[#047857] uppercase">Valid Dataset</p>
-                <p class="mt-1 font-mono text-2xl font-extrabold text-[#047857]" x-text="responses.valid || 0"></p>
+                <p class="text-[10px] font-bold tracking-wider text-[#047857] uppercase">Valid Dataset</p>
+                <p class="mt-1 text-2xl font-extrabold tabular-nums text-[#047857]" x-text="responses.valid || 0"></p>
             </div>
             <div class="p-4">
-                <p class="font-mono text-[10px] font-bold tracking-wider text-[#92400E] uppercase">Antrean Mentah</p>
-                <p class="mt-1 font-mono text-2xl font-extrabold text-[#92400E]" x-text="responses.mentah || 0"></p>
+                <p class="text-[10px] font-bold tracking-wider text-[#92400E] uppercase">Antrean Mentah</p>
+                <p class="mt-1 text-2xl font-extrabold tabular-nums text-[#92400E]" x-text="responses.mentah || 0"></p>
             </div>
             <div class="p-4">
-                <p class="font-mono text-[10px] font-bold tracking-wider text-slate-500 uppercase">Ditolak</p>
-                <p class="mt-1 font-mono text-2xl font-extrabold text-slate-700" x-text="responses.ditolak || 0"></p>
+                <p class="text-[10px] font-bold tracking-wider text-slate-500 uppercase">Ditolak</p>
+                <p class="mt-1 text-2xl font-extrabold tabular-nums text-slate-700" x-text="responses.ditolak || 0"></p>
             </div>
         </div>
 
@@ -28,8 +28,11 @@
             <template x-if="csvUrl">
                 <a :href="csvUrl" class="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:border-[#0069A8] hover:text-[#0069A8]">Unduh CSV</a>
             </template>
-            <template x-if="preprocessUrl">
+            <template x-if="preprocessUrl && !meta.status_aktif">
                 <a :href="preprocessUrl" class="inline-flex h-9 items-center rounded-xl bg-[#0069A8] px-4 text-xs font-bold text-white hover:bg-[#182654]">Buka Pre-processing</a>
+            </template>
+            <template x-if="preprocessUrl && meta.status_aktif">
+                <span class="text-xs font-medium text-[#475569]">Tutup formulir untuk Pre-processing</span>
             </template>
         </div>
     </section>
@@ -49,7 +52,7 @@
                     <button type="button" @click="responsesSubTab = 'question'" :class="responsesSubTab === 'question' ? 'bg-[#0069A8] text-white' : 'text-slate-600 hover:text-slate-900'" class="rounded-lg px-4 py-1.5 transition">Per Pertanyaan</button>
                     <button type="button" @click="responsesSubTab = 'individual'" :class="responsesSubTab === 'individual' ? 'bg-[#0069A8] text-white' : 'text-slate-600 hover:text-slate-900'" class="rounded-lg px-4 py-1.5 transition">Individual</button>
                 </div>
-                <span class="font-mono text-xs text-[#475569]" x-text="`${responses.questions.length} kolom terukur`"></span>
+                <span class="text-xs tabular-nums text-[#475569]" x-text="`${responses.questions.length} kolom terukur`"></span>
             </div>
 
             <!-- Sub-tab 1: 2-Column Bento Charts Grid -->
@@ -63,11 +66,11 @@
                                     <p class="mt-0.5 text-xs text-[#475569]">
                                         <span x-text="`${qStat.answered_count} jawaban`"></span>
                                         <template x-if="qStat.avg !== null">
-                                            <span class="ml-1.5 font-mono font-bold text-[#0069A8]" x-text="`· Rata-rata: ${qStat.avg}`"></span>
+                                            <span class="ml-1.5 font-bold tabular-nums text-[#0069A8]" x-text="`· Rata-rata: ${qStat.avg}`"></span>
                                         </template>
                                     </p>
                                 </div>
-                                <span class="rounded bg-[#F0F9FF] px-2 py-0.5 font-mono text-[10px] font-bold text-[#0069A8]" x-text="typeLabel(qStat.type)"></span>
+                                <span class="rounded bg-[#F0F9FF] px-2 py-0.5 text-[10px] font-bold text-[#0069A8]" x-text="typeLabel(qStat.type)"></span>
                             </div>
 
                             <template x-if="qStat.chart_kind && qStat.series && qStat.series.length > 0">
@@ -77,7 +80,7 @@
                                         <template x-for="pt in qStat.series" :key="pt.n">
                                             <div class="flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFC] px-2.5 py-1.5">
                                                 <span class="truncate font-semibold text-slate-800" x-text="pt.n"></span>
-                                                <span class="font-mono font-bold text-[#0069A8]" x-text="pt.v"></span>
+                                                <span class="font-bold tabular-nums text-[#0069A8]" x-text="pt.v"></span>
                                             </div>
                                         </template>
                                     </div>
@@ -119,7 +122,7 @@
                                         <p class="font-bold text-slate-900" x-text="ans.value"></p>
                                         <p class="mt-0.5 text-[#475569]" x-text="`${ans.user_name} (${ans.user_nim}) · ${ans.at}`"></p>
                                     </div>
-                                    <span class="font-mono text-[11px] font-bold text-[#0069A8]" x-text="ans.sub_code"></span>
+                                    <span class="text-[11px] font-bold tabular-nums text-[#0069A8]" x-text="ans.sub_code"></span>
                                 </div>
                             </template>
                         </div>
@@ -137,7 +140,7 @@
                         </div>
                         <div class="flex items-center gap-2 text-xs font-bold">
                             <button type="button" @click="responseIndividualIdx = Math.max(0, responseIndividualIdx - 1)" :disabled="responseIndividualIdx <= 0" class="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-35">‹</button>
-                            <span class="font-mono text-slate-700" x-text="`${responseIndividualIdx + 1} / ${responses.submissions.length}`"></span>
+                            <span class="tabular-nums text-slate-700" x-text="`${responseIndividualIdx + 1} / ${responses.submissions.length}`"></span>
                             <button type="button" @click="responseIndividualIdx = Math.min(responses.submissions.length - 1, responseIndividualIdx + 1)" :disabled="responseIndividualIdx >= responses.submissions.length - 1" class="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-35">›</button>
                         </div>
                     </div>

@@ -4,7 +4,7 @@
         <aside class="flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl">
             <div class="flex items-center justify-between bg-linear-to-r from-[#09122C] to-[#182654] px-5 py-4 text-white">
                 <div>
-                    <p class="font-mono text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Identitas Visual</p>
+                    <p class="text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Identitas Visual</p>
                     <h2 class="text-base font-extrabold">Sesuaikan Tampilan UNUSA</h2>
                 </div>
                 <button type="button" @click="themeDrawerOpen = false" class="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-bold hover:bg-white/25">Tutup</button>
@@ -86,15 +86,15 @@
                     <div class="grid grid-cols-3 gap-2">
                         <label class="block">
                             <span class="mb-1 block text-[11px] font-semibold text-slate-600">Header (px)</span>
-                            <input type="number" min="18" max="32" x-model.number="settings.theme.header_size" class="h-8 w-full rounded-lg border border-slate-200 px-2 text-center font-mono" />
+                            <input type="number" min="18" max="32" x-model.number="settings.theme.header_size" class="h-8 w-full rounded-lg border border-slate-200 px-2 text-center tabular-nums" />
                         </label>
                         <label class="block">
                             <span class="mb-1 block text-[11px] font-semibold text-slate-600">Tanya (px)</span>
-                            <input type="number" min="13" max="20" x-model.number="settings.theme.question_size" class="h-8 w-full rounded-lg border border-slate-200 px-2 text-center font-mono" />
+                            <input type="number" min="13" max="20" x-model.number="settings.theme.question_size" class="h-8 w-full rounded-lg border border-slate-200 px-2 text-center tabular-nums" />
                         </label>
                         <label class="block">
                             <span class="mb-1 block text-[11px] font-semibold text-slate-600">Teks (px)</span>
-                            <input type="number" min="11" max="16" x-model.number="settings.theme.text_size" class="h-8 w-full rounded-lg border border-slate-200 px-2 text-center font-mono" />
+                            <input type="number" min="11" max="16" x-model.number="settings.theme.text_size" class="h-8 w-full rounded-lg border border-slate-200 px-2 text-center tabular-nums" />
                         </label>
                     </div>
                 </div>
@@ -109,7 +109,7 @@
         <aside class="flex h-full w-full max-w-md flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl">
             <div class="flex items-center justify-between bg-linear-to-r from-[#09122C] to-[#182654] px-5 py-4 text-white">
                 <div>
-                    <p class="font-mono text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Re-use Instrumen</p>
+                    <p class="text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Re-use Instrumen</p>
                     <h2 class="text-base font-extrabold">Impor Pertanyaan Formulir Lain</h2>
                 </div>
                 <button type="button" @click="importDrawerOpen = false" class="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-bold hover:bg-white/25">Tutup</button>
@@ -141,7 +141,7 @@
                                         <input type="checkbox" :checked="importSelectedIds.includes(it.id)" @change="toggleImportField(it.id)" class="mt-0.5 h-4 w-4 accent-[#0069A8]" />
                                         <div class="min-w-0">
                                             <p class="font-bold text-slate-900" x-text="it.label"></p>
-                                            <p class="font-mono text-[10px] text-slate-500" x-text="typeLabel(it.type)"></p>
+                                            <p class="text-[10px] text-slate-500" x-text="typeLabel(it.type)"></p>
                                         </div>
                                     </label>
                                 </template>
@@ -169,7 +169,7 @@
         <aside class="flex h-full w-full max-w-md flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl">
             <div class="flex items-center justify-between bg-linear-to-r from-[#09122C] to-[#182654] px-5 py-4 text-white">
                 <div>
-                    <p class="font-mono text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Distribusi Instrumen</p>
+                    <p class="text-[10px] font-bold tracking-wider text-[#74D4FF] uppercase">Distribusi Instrumen</p>
                     <h2 class="text-base font-extrabold">Bagikan Formulir</h2>
                 </div>
                 <button type="button" @click="shareDrawerOpen = false" class="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-bold hover:bg-white/25">Tutup</button>
@@ -178,7 +178,7 @@
             <div class="flex-1 space-y-5 overflow-y-auto p-5 text-xs">
                 <div class="rounded-xl border border-slate-200 bg-[#F8FAFC] p-4">
                     <p class="font-bold text-slate-800">Tautan Portal Pengisian</p>
-                    <p class="mt-1 break-all font-mono text-[11px] text-[#0069A8]" x-text="publicUrl || ''"></p>
+                    <p class="mt-1 break-all text-[11px] text-[#0069A8]" x-text="publicUrl || ''"></p>
                     <div class="mt-3 flex flex-wrap gap-2">
                         <button type="button" @click="copyPublicLink()" class="rounded-lg bg-[#0069A8] px-3.5 py-2 font-bold text-white">Salin Tautan</button>
                         <a :href="publicUrl" target="_blank" class="rounded-lg border border-slate-200 bg-white px-3.5 py-2 font-bold text-slate-700 hover:text-[#0069A8]">Buka Halaman</a>
@@ -190,14 +190,14 @@
                     <div class="mt-2 grid grid-cols-2 gap-2">
                         <label>
                             <span class="block text-[10px] text-slate-500">Lebar (px)</span>
-                            <input type="number" x-model.number="embedWidth" class="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 font-mono" />
+                            <input type="number" x-model.number="embedWidth" class="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 tabular-nums" />
                         </label>
                         <label>
                             <span class="block text-[10px] text-slate-500">Tinggi (px)</span>
-                            <input type="number" x-model.number="embedHeight" class="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 font-mono" />
+                            <input type="number" x-model.number="embedHeight" class="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 tabular-nums" />
                         </label>
                     </div>
-                    <textarea rows="3" readonly :value="embedHtmlCode()" class="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700"></textarea>
+                    <textarea rows="3" readonly :value="embedHtmlCode()" class="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 text-[11px] text-slate-700"></textarea>
                     <button type="button" @click="copyEmbedCode()" class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-bold text-slate-700 hover:text-[#0069A8]">Salin Kode HTML</button>
                 </div>
 

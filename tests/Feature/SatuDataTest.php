@@ -387,6 +387,23 @@ class SatuDataTest extends TestCase
             ."2026-10-01 09:15,Sistem Enterprise,BI,20000000\r\n";
 
         $csvFile = UploadedFile::fake()->createWithContent('gform-export.csv', $csv);
+
+        // GATE CHECK 0: Open form MUST BE CLOSED before entering Pre-processing Data
+        $this->actingAs($wali)
+            ->get(route('panel.preprocessing.show', $form->code))
+            ->assertRedirect(route('panel.preprocessing'))
+            ->assertSessionHas('error');
+        $this->actingAs($wali)
+            ->from(route('panel.preprocessing'))
+            ->post(route('panel.preprocessing.import', $form->code), ['file' => $csvFile])
+            ->assertRedirect(route('panel.preprocessing'))
+            ->assertSessionHas('error');
+
+        $this->actingAs($wali)
+            ->patch(route('panel.formulir.toggle', $form->code))
+            ->assertRedirect();
+        $this->assertTrue($form->fresh()->isClosed());
+
         $this->actingAs($wali)
             ->post(route('panel.preprocessing.import', $form->code), ['file' => $csvFile])
             ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
@@ -1215,7 +1232,8 @@ class SatuDataTest extends TestCase
             ],
         ])->assertStatus(201);
 
-        // Pre-processing finalization + Dataset Rekap AVG on linear_scale passes cleanly!
+        // Close form then Pre-processing finalization + Dataset Rekap AVG on linear_scale passes cleanly!
+        $form->update(['status_aktif' => false]);
         $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
             ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
             ->assertSessionHas('success');
@@ -1384,18 +1402,19 @@ class SatuDataTest extends TestCase
         $this->assertNotEmpty($storedPath);
         $this->assertSame($part1.$part2, Storage::disk('local')->get($storedPath));
 
-        // Download & Pre-processing finalize work cleanly for .zip attachments
+        // Download & direct multipart fallback work while open; closing unlocks pre-processing finalize
         $this->actingAs($mhs1)->get(route('panel.submissions.file', [$sub->code, 'dokumen']))->assertStatus(200);
-        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
-            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
-            ->assertSessionHas('success');
-        $this->assertTrue($form->fresh()->isPreprocessed());
 
-        // 5. Direct multipart fallback also accepts .docx without failing mime check
         $docx = UploadedFile::fake()->create('artikel.docx', 200, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         $this->actingAs($mhs1)->postJson(route('panel.isi.submit', $form->code), [
             'files' => ['dokumen' => $docx],
         ])->assertStatus(201);
+
+        $form->update(['status_aktif' => false]);
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $form->code))
+            ->assertRedirect(route('panel.preprocessing', ['form' => $form->code]))
+            ->assertSessionHas('success');
+        $this->assertTrue($form->fresh()->isPreprocessed());
 
         // 6. Chunked Studio image media upload succeeds
         $mediaChunk = $this->actingAs($wali)->call(
@@ -1518,6 +1537,9 @@ class SatuDataTest extends TestCase
         $this->actingAs($wali)->get(route('panel.submissions.file', [$sub1->code, 'bukti']))->assertStatus(200);
         $this->actingAs($wali)->get(route('panel.submissions.file', [$sub1->code, 'bukti', 'inline' => 1]))->assertStatus(200);
 
+        // Close form before entering Pre-processing Data workbench
+        $form->update(['status_aktif' => false]);
+
         // 4. Pre-processing table shows attachment links & edit page link, with NO clean-modal popup
         $this->actingAs($wali)->get(route('panel.preprocessing', ['form' => $form->code]))
             ->assertStatus(200)
@@ -1624,7 +1646,7 @@ class SatuDataTest extends TestCase
             'periode' => 'Ganjil',
             'target' => 'Mahasiswa',
             'tanggal_waktu' => now()->addDays(5),
-            'status_aktif' => true,
+            'status_aktif' => false,
             'status_preprocessing' => 'proses',
             'dibuat_oleh' => $wali->id,
         ]);
@@ -1646,7 +1668,7 @@ class SatuDataTest extends TestCase
             'tahun' => 2025,
             'periode' => 'Genap',
             'target' => 'Semua',
-            'tanggal_waktu' => now()->addDays(5),
+            'tanggal_waktu' => now()->subDay(),
             'status_aktif' => true,
             'status_preprocessing' => 'siap',
             'dibuat_oleh' => $wali->id,
@@ -1670,23 +1692,43 @@ class SatuDataTest extends TestCase
             'periode' => 'Ganjil',
             'target' => 'Dosen',
             'tanggal_waktu' => now()->addDays(5),
-            'status_aktif' => true,
+            'status_aktif' => false,
             'status_preprocessing' => 'belum',
             'dibuat_oleh' => $wali->id,
         ]);
         $formEmpty->syncFields([['id' => 'lab', 'label' => 'Lab', 'type' => 'text', 'required' => true]]);
 
-        // 1. /panel/preprocessing displays front-page form directory without a <select name="form"> dropdown
+        $formStillOpen = DataForm::create([
+            'code' => 'F-DIR-OPEN',
+            'id_kategori' => $cat1->id,
+            'judul' => 'Survei Aktif Masih Terbuka',
+            'deskripsi' => 'Belum boleh masuk preprocessing',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'status_preprocessing' => 'proses',
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $formStillOpen->syncFields([['id' => 'opsi', 'label' => 'Opsi', 'type' => 'text', 'required' => true]]);
+
+        // 1. /panel/preprocessing displays closed-form directory without <select name="form"> and excludes open forms
         $this->actingAs($wali)->get(route('panel.preprocessing'))
             ->assertStatus(200)
             ->assertSee('Pilih Formulir Pre-processing', false)
             ->assertSee('Pendataan Riset Antrean 2026', false)
             ->assertSee('Survei Alumni Terverifikasi 2025', false)
             ->assertSee('Kuesioner Lab Kosong 2024', false)
+            ->assertDontSee('Survei Aktif Masih Terbuka', false)
             ->assertSee(route('panel.preprocessing.show', $formQueue->code), false)
             ->assertSee(route('panel.preprocessing.show', $formReady->code), false)
             ->assertDontSee('name="form"', false)
             ->assertDontSee('&amp;amp;', false);
+
+        $this->actingAs($wali)->get(route('panel.preprocessing.show', $formStillOpen->code))
+            ->assertRedirect(route('panel.preprocessing'))
+            ->assertSessionHas('error');
 
         // 2. Search & filters on front directory work accurately
         $this->actingAs($wali)->get(route('panel.preprocessing', ['q' => 'F-DIR-READY']))
@@ -1798,6 +1840,9 @@ class SatuDataTest extends TestCase
         $this->assertSame('Sequence-8.drawio.png', $sub->values['bukti']);
         $this->assertSame($pngPart1.$pngPart2, Storage::disk('local')->get($sub->attachments['bukti']));
         $this->actingAs($mhs)->get(route('panel.submissions.file', [$sub->code, 'bukti']))->assertStatus(200);
+
+        // Close form before editing/replacing attachments in Pre-processing Data
+        $form->update(['status_aktif' => false]);
 
         // Replacement via JSON Base64 on preprocessing submission edit endpoint
         $repPdf = '%PDF-1.7 '.random_bytes(2048).'%%EOF';
@@ -1965,5 +2010,155 @@ class SatuDataTest extends TestCase
         // Windows ServeCommand passthrough preserves TEMP/TMP for php artisan serve uploads
         $this->assertContains('TEMP', \Illuminate\Foundation\Console\ServeCommand::$passthroughVariables);
         $this->assertContains('TMP', \Illuminate\Foundation\Console\ServeCommand::$passthroughVariables);
+    }
+
+    public function test_user_workflow_cleanup_produsen_history_closed_preprocessing_dataset_page_and_wali_warning(): void
+    {
+        $wali = User::query()->where('nim', 'walidata')->firstOrFail();
+        $mhs = User::query()->where('nim', '1462200031')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+
+        $openForm = DataForm::create([
+            'code' => 'F-UX-OPEN',
+            'id_kategori' => $category->id,
+            'judul' => 'Pendataan Rekognisi Terbuka',
+            'deskripsi' => 'Sedang berjalan',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->addDays(5),
+            'status_aktif' => true,
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $openForm->syncFields([
+            ['id' => 'kegiatan', 'label' => 'Nama Kegiatan', 'type' => 'text', 'required' => true],
+            ['id' => 'skala', 'label' => 'Skala', 'type' => 'select', 'required' => true, 'options' => ['Lokal', 'Nasional']],
+        ]);
+
+        // 1. Produsen submits form and views riwayat/ringkasan without status columns/badges
+        $this->actingAs($mhs)->postJson(route('panel.isi.submit', $openForm->code), [
+            'values' => ['kegiatan' => 'Lomba UI/UX', 'skala' => 'Nasional'],
+        ])->assertStatus(201);
+
+        $this->actingAs($mhs)->get(route('panel.riwayat'))
+            ->assertStatus(200)
+            ->assertSee('Pendataan Rekognisi Terbuka', false)
+            ->assertDontSee('Status Pre-processing', false)
+            ->assertDontSee('Menunggu Pre-processing', false)
+            ->assertDontSee('Valid (Siap Dataset)', false)
+            ->assertDontSee('Lompat cepat modul', false)
+            ->assertDontSee('panelShell', false);
+
+        $this->actingAs($mhs)->get(route('panel.ringkasan'))
+            ->assertStatus(200)
+            ->assertDontSee('Menunggu Pre-processing', false)
+            ->assertDontSee('Valid (Siap Dataset)', false)
+            ->assertDontSee('Ditolak', false);
+
+        // 2. Produsen form runner does not expose Alur Satu Data box or font-mono
+        $this->actingAs($mhs)->get(route('formulir.show', $openForm->code))
+            ->assertStatus(200)
+            ->assertDontSee('Alur Satu Data', false)
+            ->assertDontSee('font-mono', false);
+
+        // 3. Wali Data opening formulir.show sees only concise warning without Identitas Responden / Alur Satu Data / Pre-processing button
+        $this->actingAs($wali)->get(route('formulir.show', $openForm->code))
+            ->assertStatus(200)
+            ->assertSee('Wali Data tidak diperkenankan mengisi data.', false)
+            ->assertDontSee('Identitas Responden', false)
+            ->assertDontSee('Alur Satu Data', false)
+            ->assertDontSee('Buka Pre-processing Data', false);
+
+        // 4. Open form cannot be preprocessed until closed (or deadline passed), nor built into a dataset
+        $this->actingAs($wali)->get(route('panel.ringkasan'))
+            ->assertStatus(200)
+            ->assertSee('data-scene="ambient"', false)
+            ->assertSee('data-motion-toggle', false)
+            ->assertSee('data-scene="walidata-pipeline"', false)
+            ->assertDontSee('font-mono', false)
+            ->assertDontSee('Lompat cepat modul', false);
+
+        $this->actingAs($wali)->get(route('panel.riwayat'))
+            ->assertStatus(200)
+            ->assertSee('data-scene="walidata-header"', false)
+            ->assertSee('data-scene="ambient"', false);
+
+        $this->actingAs($wali)->get(route('panel.preprocessing'))
+            ->assertStatus(200)
+            ->assertSee('data-scene="walidata-header"', false)
+            ->assertSee('data-scene="ambient"', false)
+            ->assertDontSee('Pendataan Rekognisi Terbuka', false);
+
+        $this->actingAs($wali)->get(route('panel.preprocessing.show', $openForm->code))
+            ->assertRedirect(route('panel.preprocessing'))
+            ->assertSessionHas('error');
+
+        $this->actingAs($wali)->patch(route('panel.formulir.toggle', $openForm->code))
+            ->assertRedirect();
+        $this->assertTrue($openForm->fresh()->isClosed());
+
+        $this->actingAs($wali)->get(route('panel.preprocessing'))
+            ->assertStatus(200)
+            ->assertSee('Pendataan Rekognisi Terbuka', false);
+
+        $this->actingAs($wali)->post(route('panel.preprocessing.finalize', $openForm->code))
+            ->assertRedirect(route('panel.preprocessing', ['form' => $openForm->code]))
+            ->assertSessionHas('success');
+        $this->assertTrue($openForm->fresh()->isPreprocessed());
+
+        // Also create a second closed form NOT yet preprocessed, and an open form: neither should be selectable on /panel/dataset/buat
+        $unprocessedClosed = DataForm::create([
+            'code' => 'F-UX-WAIT',
+            'id_kategori' => $category->id,
+            'judul' => 'Formulir Belum Pre-processing',
+            'deskripsi' => 'Masih mentah',
+            'tahun' => 2026,
+            'periode' => 'Ganjil',
+            'target' => 'Mahasiswa',
+            'tanggal_waktu' => now()->subHour(),
+            'status_aktif' => false,
+            'status_preprocessing' => 'proses',
+            'dibuat_oleh' => $wali->id,
+        ]);
+        $unprocessedClosed->syncFields([['id' => 'x', 'label' => 'X', 'type' => 'text', 'required' => true]]);
+
+        // 5. Dedicated dataset creation page (/panel/dataset/buat) uses radio cards, no dropdown, no modal popup
+        $this->actingAs($wali)->get(route('panel.dataset'))
+            ->assertStatus(200)
+            ->assertSee('data-scene="walidata-header"', false)
+            ->assertSee('data-scene="ambient"', false)
+            ->assertSee(route('panel.dataset.create'), false)
+            ->assertDontSee('Buat dataset dari formulir siap pakai', false);
+
+        $this->actingAs($wali)->get(route('panel.dataset.create'))
+            ->assertStatus(200)
+            ->assertSee('data-scene="walidata-header"', false)
+            ->assertSee('data-scene="ambient"', false)
+            ->assertSee('Pendataan Rekognisi Terbuka', false)
+            ->assertSee('name="form_id"', false)
+            ->assertSee('type="radio"', false)
+            ->assertDontSee('<select name="form_id"', false)
+            ->assertDontSee('Formulir Belum Pre-processing', false)
+            ->assertDontSee('Lompat cepat modul', false)
+            ->assertDontSee('panelShell', false);
+
+        $this->actingAs($wali)->post(route('panel.dataset.from-form'), [
+            'form_id' => $openForm->id,
+            'mode' => 'rinci',
+            'picked_cols' => ['kegiatan', 'skala'],
+            'title' => 'Dataset Rekognisi Halaman Penuh 2026',
+            'category_id' => $category->id,
+            'tahun' => '2026',
+            'periode' => 'Ganjil',
+            'access' => 'public',
+            'format' => 'CSV',
+            'publish_status' => 'terpublikasi',
+        ])->assertRedirect(route('panel.dataset'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('dataset', [
+            'judul' => 'Dataset Rekognisi Halaman Penuh 2026',
+            'status_publikasi' => 'terpublikasi',
+        ]);
     }
 }
