@@ -48,26 +48,90 @@
         </div>
     @endif
 
-    @if(empty($readyFormsPayload))
-        <div class="wd-bento border-dashed border-slate-300 px-6 py-14 text-center">
-            <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F0F9FF] text-[#0069A8]">
-                <i data-lucide="table-2" class="h-6 w-6" aria-hidden="true"></i>
-            </span>
-            <p class="mt-4 text-base font-bold text-slate-900">Belum ada formulir yang siap dijadikan dataset</p>
-            <p class="mx-auto mt-1 max-w-md text-sm text-[#475569]">
-                Tutup formulir terlebih dahulu, lalu jalankan finalisasi di Pre-processing Data.
-            </p>
-            <div class="mt-5 flex flex-wrap justify-center gap-2.5">
-                <a href="{{ route('panel.preprocessing') }}"
-                   class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#0069A8] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#005187]">
-                    Buka Pre-processing Data
+    @if($preselectedExistingDataset)
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-[#FFFBEB] px-5 py-4 text-sm text-[#92400E]" role="status">
+            <div class="min-w-0">
+                <p class="font-bold">
+                    Formulir {{ $preselectedExistingDataset['form_code'] }} sudah memiliki dataset ({{ $preselectedExistingDataset['dataset_code'] }})
+                </p>
+                <p class="mt-0.5 text-xs">
+                    Untuk mencegah duplikasi, satu formulir hanya dapat dibuat menjadi satu dataset. Anda dapat mengubah, menyembunyikan, atau menghapus dataset yang sudah ada.
+                </p>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+                <a href="{{ route('panel.dataset.edit', $preselectedExistingDataset['dataset_code']) }}"
+                   class="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl bg-[#0069A8] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#005187]">
+                    Kelola Dataset
                 </a>
-                <a href="{{ route('panel.formulir') }}"
-                   class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                    Kelola Formulir
+                <a href="{{ route('panel.dataset.show', $preselectedExistingDataset['dataset_code']) }}"
+                   class="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3.5 py-1.5 text-xs font-bold text-[#92400E] hover:bg-amber-50">
+                    Lihat Data
                 </a>
+                <button type="button"
+                        @click="$dispatch('open-confirm', {
+                            title: 'Hapus dataset ini?',
+                            message: @js("Dataset “{$preselectedExistingDataset['dataset_title']}” ({$preselectedExistingDataset['dataset_code']}) beserta visualisasi terkait akan dihapus agar formulir {$preselectedExistingDataset['form_code']} dapat disusun ulang."),
+                            action: @js(route('panel.dataset.destroy', [$preselectedExistingDataset['dataset_code'], 'redirect_to' => 'create'])),
+                            method: 'DELETE',
+                            buttonText: 'Ya, Hapus Dataset'
+                        })"
+                        class="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-1.5 text-xs font-bold text-[#B91C1C] transition hover:bg-red-50">
+                    <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                    Hapus Dataset
+                </button>
             </div>
         </div>
+    @endif
+
+    @if(empty($readyFormsPayload))
+        @if($alreadyBuiltDatasets->isNotEmpty())
+            <div class="wd-bento p-6 sm:p-8">
+                <div class="text-center">
+                    <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F0F9FF] text-[#0069A8]">
+                        <i data-lucide="check-circle-2" class="h-6 w-6" aria-hidden="true"></i>
+                    </span>
+                    <p class="mt-4 text-base font-bold text-slate-900">Semua formulir siap sudah memiliki dataset</p>
+                    <p class="mx-auto mt-1 max-w-lg text-sm text-[#475569]">
+                        Agar tidak terjadi duplikasi, formulir yang sudah terhubung dengan dataset tidak dapat dibuat ulang. Anda dapat mengubah, menyembunyikan (Draft/Private), atau menghapus dataset yang ada.
+                    </p>
+                    <div class="mt-4 flex flex-wrap justify-center gap-2.5">
+                        <a href="{{ route('panel.dataset') }}"
+                           class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#0069A8] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#005187]">
+                            Buka Kelola Dataset
+                        </a>
+                        <a href="{{ route('panel.preprocessing') }}"
+                           class="inline-flex min-h-[42px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            Buka Pre-processing Data
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-6 border-t border-slate-100 pt-5">
+                    <p class="mb-3 text-xs font-bold tracking-wider text-[#475569] uppercase">Dataset yang sudah tersusun</p>
+                    @include('panel.partials.dataset-built-cards', ['builtDatasets' => $alreadyBuiltDatasets])
+                </div>
+            </div>
+        @else
+            <div class="wd-bento border-dashed border-slate-300 px-6 py-14 text-center">
+                <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F0F9FF] text-[#0069A8]">
+                    <i data-lucide="table-2" class="h-6 w-6" aria-hidden="true"></i>
+                </span>
+                <p class="mt-4 text-base font-bold text-slate-900">Belum ada formulir yang siap dijadikan dataset</p>
+                <p class="mx-auto mt-1 max-w-md text-sm text-[#475569]">
+                    Tutup formulir terlebih dahulu, lalu jalankan finalisasi di Pre-processing Data.
+                </p>
+                <div class="mt-5 flex flex-wrap justify-center gap-2.5">
+                    <a href="{{ route('panel.preprocessing') }}"
+                       class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#0069A8] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#005187]">
+                        Buka Pre-processing Data
+                    </a>
+                    <a href="{{ route('panel.formulir') }}"
+                       class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Kelola Formulir
+                    </a>
+                </div>
+            </div>
+        @endif
     @else
         <form action="{{ route('panel.dataset.from-form') }}"
               method="POST"
@@ -81,56 +145,94 @@
 
             <!-- Kolom Kiri: Langkah Formulir Pembuatan Dataset -->
             <div class="space-y-5 min-w-0">
-                <!-- 1. Pilih Sumber Formulir (Tanpa Dropdown) -->
+                <!-- 1. Pilih Sumber Formulir (Scrollable + Pencarian) -->
                 <section class="wd-bento p-5 sm:p-6">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 class="text-base font-bold text-slate-900">1. Pilih Formulir</h2>
-                            <p class="mt-0.5 text-xs text-[#475569]">Hanya menampilkan formulir yang sudah ditutup dan lolos Pre-processing.</p>
+                            <p class="mt-0.5 text-xs text-[#475569]">Menampilkan formulir siap pakai yang belum memiliki dataset.</p>
                         </div>
                         <span class="rounded-lg bg-[#ECFDF5] px-2.5 py-1 text-xs font-bold tabular-nums text-[#047857]"
-                              x-text="`${readyForms.length} siap`"></span>
+                              x-text="`${filteredReadyForms().length} / ${readyForms.length} tersedia`"></span>
                     </div>
 
-                    <template x-if="readyForms.length > 4">
-                        <label class="mt-4 flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 focus-within:border-[#0069A8] focus-within:bg-white">
-                            <i data-lucide="search" class="h-4 w-4 text-[#475569]" aria-hidden="true"></i>
+                    <div class="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                        <label class="flex h-10 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 focus-within:border-[#0069A8] focus-within:bg-white focus-within:ring-2 focus-within:ring-sky-100">
+                            <i data-lucide="search" class="h-4 w-4 shrink-0 text-[#475569]" aria-hidden="true"></i>
                             <input type="text"
                                    x-model="formSearch"
-                                   placeholder="Cari kode atau judul formulir..."
+                                   placeholder="Cari kode, judul, kategori, tahun, atau semester..."
+                                   aria-label="Cari formulir sumber"
                                    class="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
+                            <button type="button"
+                                    x-show="formSearch !== ''"
+                                    x-cloak
+                                    @click="formSearch = ''"
+                                    aria-label="Hapus pencarian formulir"
+                                    class="rounded-md px-1.5 py-0.5 text-xs font-bold text-slate-500 hover:bg-slate-200/70 hover:text-slate-900">
+                                Reset
+                            </button>
                         </label>
-                    </template>
 
-                    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Pilih formulir sumber">
-                        <template x-for="f in filteredReadyForms()" :key="f.id">
-                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition"
-                                   :class="String(b.formId) === String(f.id)
-                                        ? 'border-[#0069A8] bg-[#F0F9FF] ring-2 ring-[#0069A8]/15'
-                                        : 'border-slate-200 bg-white hover:border-[#0069A8]/50'">
-                                <input type="radio"
-                                       name="form_id"
-                                       :value="String(f.id)"
-                                       x-model="b.formId"
-                                       @change="onBuilderFormChange()"
-                                       class="mt-1 h-4 w-4 shrink-0 accent-[#0069A8]" />
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <span class="rounded bg-white px-2 py-0.5 text-xs font-bold text-[#0069A8] ring-1 ring-slate-200/80" x-text="f.code"></span>
-                                        <span class="rounded bg-[#ECFDF5] px-2 py-0.5 text-xs font-bold tabular-nums text-[#047857]" x-text="`${f.validCount} baris valid`"></span>
+                        <select x-model="formYearFilter"
+                                aria-label="Filter tahun formulir"
+                                class="h-10 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 text-xs font-semibold text-slate-700 outline-none focus:border-[#0069A8] focus:bg-white">
+                            <option value="all">Semua tahun</option>
+                            <template x-for="yr in availableFormYears()" :key="yr">
+                                <option :value="String(yr)" x-text="yr"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="mt-3 max-h-[340px] overflow-y-auto rounded-xl border border-slate-200/85 bg-[#F8FAFC]/80 p-3">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Pilih formulir sumber">
+                            <template x-for="f in filteredReadyForms()" :key="f.id">
+                                <label class="flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition"
+                                       :class="String(b.formId) === String(f.id)
+                                            ? 'border-[#0069A8] bg-[#F0F9FF] ring-2 ring-[#0069A8]/15'
+                                            : 'border-slate-200 bg-white hover:border-[#0069A8]/50'">
+                                    <input type="radio"
+                                           name="form_id"
+                                           :value="String(f.id)"
+                                           x-model="b.formId"
+                                           @change="onBuilderFormChange()"
+                                           class="mt-1 h-4 w-4 shrink-0 accent-[#0069A8]" />
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <span class="rounded bg-white px-2 py-0.5 text-xs font-bold text-[#0069A8] ring-1 ring-slate-200/80" x-text="f.code"></span>
+                                            <span class="rounded bg-[#ECFDF5] px-2 py-0.5 text-xs font-bold tabular-nums text-[#047857]" x-text="`${f.validCount} baris valid`"></span>
+                                        </div>
+                                        <p class="mt-2 text-sm font-bold leading-snug text-slate-900" x-text="f.title"></p>
+                                        <p class="mt-1 text-xs text-[#475569]" x-text="`${f.categoryName ? f.categoryName + ' · ' : ''}${f.tahun} · ${f.periode}`"></p>
                                     </div>
-                                    <p class="mt-2 text-sm font-bold leading-snug text-slate-900" x-text="f.title"></p>
-                                    <p class="mt-1 text-xs text-[#475569]" x-text="`${f.tahun} · ${f.periode}`"></p>
-                                </div>
-                            </label>
+                                </label>
+                            </template>
+                        </div>
+
+                        <template x-if="filteredReadyForms().length === 0">
+                            <div class="py-8 text-center">
+                                <p class="text-sm font-semibold text-slate-700">Formulir tidak ditemukan</p>
+                                <p class="mt-1 text-xs text-[#475569]">Coba ubah kata kunci pencarian atau filter tahun.</p>
+                            </div>
                         </template>
                     </div>
 
-                    <template x-if="filteredReadyForms().length === 0">
-                        <p class="mt-4 rounded-xl border border-dashed border-slate-200 py-6 text-center text-sm text-[#475569]">
-                            Formulir tidak ditemukan.
-                        </p>
-                    </template>
+                    @if($alreadyBuiltDatasets->isNotEmpty())
+                        <div class="mt-3 rounded-xl border border-slate-200/80 bg-[#F8FAFC] px-3.5 py-2.5 text-xs text-[#475569]">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p>
+                                    <span class="font-semibold text-slate-700">{{ $alreadyBuiltDatasets->count() }} formulir siap lainnya</span> sudah memiliki dataset dan disembunyikan agar tidak duplikat.
+                                </p>
+                                <button type="button"
+                                        @click="showBuiltDatasets = !showBuiltDatasets"
+                                        class="font-bold text-[#0069A8] hover:underline"
+                                        x-text="showBuiltDatasets ? 'Tutup daftar' : 'Kelola / hapus yang sudah ada'"></button>
+                            </div>
+                            <div x-show="showBuiltDatasets" x-cloak class="mt-2.5 border-t border-slate-200/80 pt-2.5">
+                                @include('panel.partials.dataset-built-cards', ['builtDatasets' => $alreadyBuiltDatasets])
+                            </div>
+                        </div>
+                    @endif
                 </section>
 
                 <!-- 2. Bentuk & Kolom Dataset -->
@@ -146,14 +248,14 @@
                                 :disabled="builderGroupable().length === 0"
                                 :class="b.mode === 'rekap' ? 'border-[#0069A8] bg-[#F0F9FF] ring-2 ring-[#0069A8]/15' : 'border-slate-200 bg-white hover:border-[#0069A8]/50'"
                                 class="min-h-[68px] rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50">
-                            <p class="text-sm font-bold text-slate-900">Rekap Agregat</p>
+                            <p class="text-sm font-bold text-slate-900">Versi Ringkas (Rekap Agregat)</p>
                             <p class="mt-0.5 text-xs text-[#475569]">Jumlah, total, atau rata-rata per grup</p>
                         </button>
                         <button type="button"
                                 @click="b.mode = 'rinci'"
                                 :class="b.mode === 'rinci' ? 'border-[#0069A8] bg-[#F0F9FF] ring-2 ring-[#0069A8]/15' : 'border-slate-200 bg-white hover:border-[#0069A8]/50'"
                                 class="min-h-[68px] rounded-xl border p-4 text-left transition">
-                            <p class="text-sm font-bold text-slate-900">Tabel Rinci</p>
+                            <p class="text-sm font-bold text-slate-900">Versi Detail (Tabel Rinci)</p>
                             <p class="mt-0.5 text-xs text-[#475569]">Semua baris valid dengan pilihan kolom</p>
                         </button>
                     </div>
@@ -164,14 +266,21 @@
                                 <p class="mb-2 text-xs font-bold text-slate-700">Kelompokkan berdasarkan <span class="text-[#B91C1C]">*</span></p>
                                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <template x-for="gf in builderGroupable()" :key="gf.id">
-                                        <label class="flex cursor-pointer items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 text-sm transition"
+                                        <label class="flex cursor-pointer items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm transition"
                                                :class="b.groupFieldId === gf.id ? 'border-[#0069A8] font-semibold text-[#0069A8]' : 'border-slate-200 text-slate-800'">
-                                            <input type="radio"
-                                                   name="group_field_id"
-                                                   :value="gf.id"
-                                                   x-model="b.groupFieldId"
-                                                   class="h-4 w-4 accent-[#0069A8]" />
-                                            <span class="truncate" x-text="gf.label"></span>
+                                            <span class="flex min-w-0 items-center gap-2.5">
+                                                <input type="radio"
+                                                       name="group_field_id"
+                                                       :value="gf.id"
+                                                       x-model="b.groupFieldId"
+                                                       class="h-4 w-4 shrink-0 accent-[#0069A8]" />
+                                                <span class="truncate" x-text="gf.label"></span>
+                                            </span>
+                                            <template x-if="gf.uniqueCount !== undefined">
+                                                <span class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+                                                      :class="gf.uniqueCount >= 2 && gf.uniqueCount <= 12 ? 'bg-[#ECFDF5] text-[#047857]' : (gf.uniqueCount > 12 ? 'bg-[#FFFBEB] text-[#92400E]' : 'bg-slate-100 text-slate-600')"
+                                                      x-text="gf.uniqueCount >= 2 && gf.uniqueCount <= 12 ? `${gf.uniqueCount} grup · ideal` : (gf.uniqueCount > 12 ? `${gf.uniqueCount} grup · padat` : `${gf.uniqueCount} grup`)"></span>
+                                            </template>
                                         </label>
                                     </template>
                                 </div>
@@ -201,7 +310,7 @@
                                         <span class="mb-1.5 block text-xs font-bold text-slate-700">Kolom angka <span class="text-[#B91C1C]">*</span></span>
                                         <select name="agg_field_id" x-model="b.aggFieldId" class="min-h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#0069A8]">
                                             <template x-for="nf in builderNumericFields()" :key="nf.id">
-                                                <option :value="nf.id" x-text="nf.label"></option>
+                                                <option :value="nf.id" :selected="String(b.aggFieldId) === String(nf.id)" x-text="nf.label"></option>
                                             </template>
                                         </select>
                                     </label>
@@ -366,6 +475,8 @@ function datasetCreateManager(readyForms, preselectedCode, oldFormId, oldState) 
     return {
         readyForms,
         formSearch: '',
+        formYearFilter: 'all',
+        showBuiltDatasets: false,
         bTried: false,
         b: {
             formId: '',
@@ -424,12 +535,20 @@ function datasetCreateManager(readyForms, preselectedCode, oldFormId, oldState) 
             }
         },
 
+        availableFormYears() {
+            const years = [...new Set(this.readyForms.map((f) => String(f.tahun)))];
+            return years.sort((a, b) => b.localeCompare(a));
+        },
+
         filteredReadyForms() {
             const q = this.formSearch.trim().toLowerCase();
-            if (!q) return this.readyForms;
-            return this.readyForms.filter((f) =>
-                `${f.code} ${f.title} ${f.tahun} ${f.periode}`.toLowerCase().includes(q)
-            );
+            return this.readyForms.filter((f) => {
+                if (this.formYearFilter !== 'all' && String(f.tahun) !== String(this.formYearFilter)) {
+                    return false;
+                }
+                if (!q) return true;
+                return `${f.code} ${f.title} ${f.categoryName || ''} ${f.tahun} ${f.periode}`.toLowerCase().includes(q);
+            });
         },
 
         builderCurrentForm() {
@@ -439,6 +558,7 @@ function datasetCreateManager(readyForms, preselectedCode, oldFormId, oldState) 
         builderGroupable() {
             const f = this.builderCurrentForm();
             if (!f) return [];
+            if (Array.isArray(f.groupableFields) && f.groupableFields.length) return f.groupableFields;
             return (f.fields || []).filter((x) =>
                 ['select', 'radio', 'checkbox', 'text', 'linear_scale', 'rating'].includes(x.type)
             );

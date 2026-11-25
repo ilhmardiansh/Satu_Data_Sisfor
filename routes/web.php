@@ -91,6 +91,7 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
         Route::post('/preprocessing/{dataForm:code}/normalize', [CollectedDataController::class, 'normalizeBatch'])->name('preprocessing.normalize');
         Route::post('/preprocessing/{dataForm:code}/deduplicate', [CollectedDataController::class, 'deduplicateBatch'])->name('preprocessing.deduplicate');
         Route::post('/preprocessing/{dataForm:code}/impute', [CollectedDataController::class, 'imputeBatch'])->name('preprocessing.impute');
+        Route::post('/preprocessing/{dataForm:code}/standard-clean', [CollectedDataController::class, 'runStandardBatch'])->name('preprocessing.standard');
         Route::post('/preprocessing/{dataForm:code}/finalize', [CollectedDataController::class, 'finalizePreprocessing'])->name('preprocessing.finalize');
 
         Route::get('/preprocessing/submissions/{submission:code}/perbaiki', [CollectedDataController::class, 'editSubmission'])->name('preprocessing.submissions.edit');
@@ -110,13 +111,13 @@ Route::prefix('panel')->name('panel.')->middleware('auth')->group(function (): v
         Route::get('/dataset', [ManageDatasetController::class, 'index'])->name('dataset');
         Route::get('/dataset/buat', [ManageDatasetController::class, 'create'])->name('dataset.create');
         Route::post('/dataset/from-form', [ManageDatasetController::class, 'storeFromForm'])->name('dataset.from-form');
+        Route::get('/dataset/{dataset:code}', [ManageDatasetController::class, 'show'])->name('dataset.show');
+        Route::get('/dataset/{dataset:code}/ubah', [ManageDatasetController::class, 'edit'])->name('dataset.edit');
         Route::patch('/dataset/{dataset:code}/access', [ManageDatasetController::class, 'toggleAccess'])->name('dataset.access');
         Route::patch('/dataset/{dataset:code}/publish', [ManageDatasetController::class, 'togglePublish'])->name('dataset.publish');
         Route::post('/dataset/{dataset:code}/sync', [ManageDatasetController::class, 'syncFromForm'])->name('dataset.sync');
         Route::put('/dataset/{dataset:code}', [ManageDatasetController::class, 'update'])->name('dataset.update');
-        Route::delete('/dataset/{dataset:code}', [ManageDatasetController::class, 'destroy'])
-            ->middleware('role:admin')
-            ->name('dataset.destroy');
+        Route::delete('/dataset/{dataset:code}', [ManageDatasetController::class, 'destroy'])->name('dataset.destroy');
 
         Route::get('/visualisasi', [VisualizationController::class, 'index'])->name('visualisasi');
         Route::post('/visualisasi', [VisualizationController::class, 'store'])->name('visualisasi.store');

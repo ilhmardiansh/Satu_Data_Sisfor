@@ -273,6 +273,10 @@ class CollectedDataController extends Controller
             ]
         );
 
+        $existingFormDataset = $activeForm->datasets()
+            ->latest('id')
+            ->first();
+
         return view('panel.data', compact(
             'activeForm',
             'submissionsPaginator',
@@ -281,6 +285,7 @@ class CollectedDataController extends Controller
             'preprocessingLogs',
             'problemCount',
             'totalSubmissionsCount',
+            'existingFormDataset',
             'q',
             'status',
             'onlyIssues'
@@ -540,6 +545,49 @@ class CollectedDataController extends Controller
         return redirect()
             ->route('panel.preprocessing', ['form' => $dataForm->code])
             ->with('success', $res['message']);
+    }
+
+    public function runStandardBatch(
+        Request $request,
+        DataForm $dataForm,
+        DataPreprocessingService $preprocessing
+    ): RedirectResponse {
+        if ($dataForm->isOpen()) {
+            return redirect()
+                ->route('panel.preprocessing')
+                ->with('error', $this->openFormBlockMessage($dataForm));
+        }
+
+        $validated = $request->validate([
+            'text_case' => ['nullable', 'in:none,title,upper,lower'],
+            'scope' => ['nullable', 'in:same_values,same_user_and_values'],
+        ]);
+
+        $res = $preprocessing->runStandardPipeline(
+            $dataForm,
+            $request->user()->id,
+            (string) ($validated['text_case'] ?? 'none'),
+            (string) ($validated['scope'] ?? 'same_values')
+        );
+
+        if ($res['active_count'] === 0) {
+            return redirect()
+                ->route('panel.preprocessing.show', $dataForm->code)
+                ->with('info', 'Belum ada baris aktif untuk diproses.');
+        }
+
+        $parts = [
+            "{$res['changed_cells']} sel diseragamkan",
+            "{$res['dedup_handled']} duplikat disisihkan",
+        ];
+
+        $nextHint = $res['remaining_issues'] === 0
+            ? 'Semua baris aktif bersih — silakan klik Finalisasi Pre-processing.'
+            : "Tersisa {$res['remaining_issues']} baris bermasalah untuk ditangani pada Tahap 4 (Missing Value / Perbaikan Sel).";
+
+        return redirect()
+            ->route('panel.preprocessing.show', $dataForm->code)
+            ->with('success', 'Standar Tahap 2–3 selesai ('.implode(', ', $parts).'). '.$nextHint);
     }
 
     public function finalizePreprocessing(

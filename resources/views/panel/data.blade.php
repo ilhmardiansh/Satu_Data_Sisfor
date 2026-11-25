@@ -36,7 +36,13 @@
                     Finalisasi Pre-processing
                 </button>
             </form>
-            @if($activeForm->isPreprocessed() && $profile['valid'] > 0)
+            @if(! empty($existingFormDataset))
+                <a href="{{ route('panel.dataset.edit', $existingFormDataset->code) }}"
+                   class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8]">
+                    <i data-lucide="table-2" class="h-4 w-4" aria-hidden="true"></i>
+                    Kelola Dataset ({{ $existingFormDataset->code }})
+                </a>
+            @elseif($activeForm->isPreprocessed() && $profile['valid'] > 0)
                 <a href="{{ route('panel.dataset.create', ['form' => $activeForm->code]) }}"
                    class="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#00A6F4] px-4 py-2 text-sm font-bold text-[#09122C] transition hover:bg-[#38BDF8]">
                     <i data-lucide="table-2" class="h-4 w-4" aria-hidden="true"></i>
@@ -135,12 +141,87 @@
         </section>
 
         @if($totalSubmissionsCount > 0)
+            <!-- Standar Pengolahan Data (5 Tahap Baku Satu Data) -->
+            <section class="wd-bento mb-5 p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                        <p class="text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Standar Pengolahan Data</p>
+                        <h3 class="mt-0.5 text-sm font-extrabold text-slate-900">Alur Baku Pre-processing Sebelum Dataset &amp; Visualisasi</h3>
+                        <p class="mt-0.5 text-xs text-[#475569]">
+                            Ikuti urutan Tahap 1 → Tahap 5 agar grafik tidak terpecah oleh typo/kapitalisasi, bebas hitung ganda, dan nilai statistik akurat.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button"
+                                @click="standarOpen = !standarOpen"
+                                class="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-[#0069A8] hover:text-[#0069A8]">
+                            <i data-lucide="book-open-check" class="h-3.5 w-3.5 text-[#0069A8]" aria-hidden="true"></i>
+                            <span x-text="standarOpen ? 'Tutup Panduan Standar' : 'Panduan Standar &amp; Visualisasi'"></span>
+                        </button>
+                        <form method="POST" action="{{ route('panel.preprocessing.standard', $activeForm->code) }}" class="inline">
+                            @csrf
+                            <button type="submit"
+                                    {{ $profile['active_count'] === 0 ? 'disabled' : '' }}
+                                    class="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl bg-[#0069A8] px-3.5 py-1.5 text-xs font-bold text-white transition hover:bg-[#182654] disabled:cursor-not-allowed disabled:opacity-45">
+                                <i data-lucide="wand-sparkles" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                                Jalankan Standar Tahap 2→3
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+                    @foreach($profile['standard_stages'] ?? [] as $stg)
+                        <div class="rounded-xl border p-3 text-xs {{ $stg['done'] ? 'border-emerald-200 bg-[#ECFDF5]/60' : 'border-slate-200 bg-[#F8FAFC]' }}">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-extrabold text-[#0069A8]">Tahap {{ $stg['step'] }}</span>
+                                <span class="rounded-md px-1.5 py-0.5 text-[10px] font-bold {{ $stg['done'] ? 'bg-[#047857] text-white' : 'bg-[#FFFBEB] text-[#92400E] ring-1 ring-amber-200' }}">
+                                    {{ $stg['status_label'] }}
+                                </span>
+                            </div>
+                            <p class="mt-1.5 font-bold text-slate-900">{{ $stg['title'] }}</p>
+                            <p class="mt-0.5 text-[11px] leading-relaxed text-[#475569]">{{ $stg['desc'] }}</p>
+                        </div>
+                    @endforeach
+                </div>
+
+                @if(($profile['outlier_cells'] ?? 0) > 0)
+                    <div class="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-[#FFFBEB] px-3.5 py-2.5 text-xs text-[#92400E]">
+                        <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
+                        <span>
+                            Terdeteksi <strong>{{ $profile['outlier_cells'] }} nilai ekstrem (outlier)</strong> pada kolom numerik. Periksa baris terkait sebelum menghitung rata-rata atau membuat grafik agar skala tidak timpang.
+                        </span>
+                    </div>
+                @endif
+
+                <div x-show="standarOpen" x-cloak x-transition class="mt-4 grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 text-xs md:grid-cols-2">
+                    <div class="rounded-xl border border-slate-200/80 bg-[#F8FAFC] p-4 space-y-2">
+                        <p class="font-extrabold text-slate-900">Aturan Baku Kualitas Data per Tipe Kolom</p>
+                        <ul class="space-y-1.5 text-[#475569]">
+                            <li><strong class="text-slate-800">1. Teks &amp; Pilihan:</strong> Spasi ganda dipangkas, label radio/select/checkbox disamakan dengan opsi resmi agar kategori grafik tidak terpecah (mis. <em>"Nasional"</em> vs <em>"nasional "</em>).</li>
+                            <li><strong class="text-slate-800">2. Angka &amp; Mata Uang:</strong> Simbol <code>Rp</code>, <code>%</code>, dan pemisah ribuan dibersihkan menjadi numerik murni agar SUM/AVG/grafik batang dapat dihitung.</li>
+                            <li><strong class="text-slate-800">3. Tanggal:</strong> Diseragamkan ke format ISO <code>YYYY-MM-DD</code> agar pengurutan grafik garis/tren kronologis akurat.</li>
+                            <li><strong class="text-slate-800">4. Jejak Audit:</strong> Nilai asli tetap disimpan sebagai <code>nilai_mentah</code> untuk audit tanpa kehilangan histori respons.</li>
+                        </ul>
+                    </div>
+                    <div class="rounded-xl border border-slate-200/80 bg-[#F8FAFC] p-4 space-y-2">
+                        <p class="font-extrabold text-slate-900">Standar Kelayakan Menuju Visualisasi</p>
+                        <ul class="space-y-1.5 text-[#475569]">
+                            <li><strong class="text-slate-800">1. Bebas Baris Bermasalah:</strong> Wajib <code>0</code> sel wajib kosong, <code>0</code> format invalid, dan <code>0</code> duplikat sebelum Finalisasi.</li>
+                            <li><strong class="text-slate-800">2. Gunakan Versi Ringkas untuk Grafik:</strong> Pilih kolom pengelompokan dengan <code>2–12</code> nilai unik (mis. Tingkat, Skala, Status) agar grafik Batang/Donat terbaca jelas.</li>
+                            <li><strong class="text-slate-800">3. Gunakan Versi Detail untuk Tabel:</strong> Kolom teks bebas/unik tinggi (mis. Nama Kegiatan) lebih cocok disajikan dalam <em>Versi Detail (Tabel Rinci)</em>.</li>
+                            <li><strong class="text-slate-800">4. Tinjau Outlier Numerik:</strong> Jika terdapat nilai ekstrem (metode IQR), pilih agregasi <em>Median/Count</em> atau koreksi salah ketik satuan angka.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
             <!-- Ringkasan Kelengkapan per Kolom -->
             <section class="wd-bento mb-5 p-5">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                        <h3 class="text-sm font-bold text-slate-900">Kelengkapan Kolom</h3>
-                        <p class="text-xs text-[#475569]">Dari {{ $profile['active_count'] }} baris aktif</p>
+                        <h3 class="text-sm font-bold text-slate-900">Kelengkapan &amp; Profil Kolom</h3>
+                        <p class="text-xs text-[#475569]">Dari {{ $profile['active_count'] }} baris aktif · rata-rata lengkap {{ $profile['completeness_avg'] ?? 100 }}%</p>
                     </div>
                     <button type="button"
                             @click="profilingExpanded = !profilingExpanded"
@@ -151,6 +232,18 @@
 
                 <div x-show="profilingExpanded" x-transition class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach($profile['columns'] as $colStat)
+                        @php
+                            $vizTag = $colStat['viz_suitability'] ?? 'detail_only';
+                            $vizMeta = match ($vizTag) {
+                                'group_ideal' => ['Ideal Grup Grafik', 'bg-[#ECFDF5] text-[#047857]'],
+                                'metric_ideal' => ['Siap Metrik Angka', 'bg-[#F0F9FF] text-[#0069A8]'],
+                                'needs_fix' => ['Perlu Perbaikan', 'bg-red-50 text-[#B91C1C]'],
+                                'low_variance' => ['Variansi Tunggal', 'bg-slate-200 text-slate-700'],
+                                'empty' => ['Kosong', 'bg-slate-200 text-slate-700'],
+                                default => ['Cocok Versi Detail', 'bg-slate-100 text-slate-700'],
+                            };
+                            $numStats = $colStat['numeric_stats'] ?? ['count' => 0, 'outlier_count' => 0];
+                        @endphp
                         <div class="rounded-xl border border-slate-200/80 bg-[#F8FAFC] p-3.5">
                             <div class="flex items-start justify-between gap-2">
                                 <p class="truncate text-xs font-bold text-slate-900" title="{{ $colStat['label'] }}">{{ $colStat['label'] }}</p>
@@ -163,7 +256,22 @@
                                 <span>Lengkap: <strong class="text-slate-900">{{ $colStat['completeness_pct'] }}%</strong></span>
                                 <span>Kosong: <strong class="{{ $colStat['missing'] > 0 ? 'text-[#B91C1C]' : 'text-slate-700' }}">{{ $colStat['missing'] }}</strong></span>
                                 <span>Invalid: <strong class="{{ $colStat['invalid'] > 0 ? 'text-[#B91C1C]' : 'text-slate-700' }}">{{ $colStat['invalid'] }}</strong></span>
+                                <span>Unik: <strong class="text-slate-800">{{ $colStat['unique_count'] ?? 0 }}</strong></span>
                             </div>
+                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                <span class="rounded px-1.5 py-0.5 text-[10px] font-bold {{ $vizMeta[1] }}">{{ $vizMeta[0] }}</span>
+                                @if(($colStat['non_uniform'] ?? 0) > 0)
+                                    <span class="rounded bg-[#FFFBEB] px-1.5 py-0.5 text-[10px] font-bold text-[#92400E]">{{ $colStat['non_uniform'] }} belum seragam</span>
+                                @endif
+                                @if(($numStats['outlier_count'] ?? 0) > 0)
+                                    <span class="rounded bg-[#FFFBEB] px-1.5 py-0.5 text-[10px] font-bold text-[#92400E]">{{ $numStats['outlier_count'] }} outlier</span>
+                                @endif
+                            </div>
+                            @if(($numStats['count'] ?? 0) > 0)
+                                <p class="mt-1.5 text-[11px] tabular-nums text-[#475569]">
+                                    Rentang: <strong class="text-slate-800">{{ $numStats['min'] }}</strong> – <strong class="text-slate-800">{{ $numStats['max'] }}</strong> (median {{ $numStats['median'] }})
+                                </p>
+                            @endif
                             @if($colStat['missing'] > 0 && ! empty($colStat['id']))
                                 <button type="button"
                                         @click="targetMissingField(@js($colStat['id']))"
@@ -180,8 +288,9 @@
             <section class="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <form method="POST" action="{{ route('panel.preprocessing.normalize', $activeForm->code) }}" class="wd-bento flex flex-col p-5">
                     @csrf
-                    <p class="text-sm font-bold text-slate-900">Normalisasi</p>
-                    <p class="mt-1 text-xs text-[#475569]">Rapikan spasi, pilihan, dan format angka.</p>
+                    <p class="text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Tahap 2</p>
+                    <p class="mt-0.5 text-sm font-bold text-slate-900">Normalisasi Format</p>
+                    <p class="mt-1 text-xs text-[#475569]">Rapikan spasi, pilihan, tanggal ISO, dan format angka.</p>
                     <div class="mt-3.5 space-y-2.5 text-xs">
                         <label class="flex cursor-pointer items-center gap-2 text-slate-800">
                             <input type="checkbox" name="normalize_numbers" value="1" checked class="h-4 w-4 accent-[#0069A8]" />
@@ -207,7 +316,10 @@
                 <form method="POST" action="{{ route('panel.preprocessing.deduplicate', $activeForm->code) }}" class="wd-bento flex flex-col p-5">
                     @csrf
                     <div class="flex items-center justify-between gap-2">
-                        <p class="text-sm font-bold text-slate-900">Deduplikasi</p>
+                        <div>
+                            <p class="text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Tahap 3</p>
+                            <p class="mt-0.5 text-sm font-bold text-slate-900">Deduplikasi</p>
+                        </div>
                         @if($profile['duplicate_rows'] > 0)
                             <span class="rounded-full bg-[#FFFBEB] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[#92400E] ring-1 ring-amber-200">{{ $profile['duplicate_rows'] }} ganda</span>
                         @endif
@@ -243,7 +355,8 @@
                       :class="imputePulse ? 'ring-2 ring-[#00A6F4] border-[#0069A8]' : ''"
                       class="wd-bento flex flex-col p-5 transition-all">
                     @csrf
-                    <p class="text-sm font-bold text-slate-900">Missing Value</p>
+                    <p class="text-[11px] font-bold tracking-wider text-[#0069A8] uppercase">Tahap 4</p>
+                    <p class="mt-0.5 text-sm font-bold text-slate-900">Missing Value</p>
                     <p class="mt-1 text-xs text-[#475569]">Isi nilai kosong atau tandai ditolak.</p>
                     <div class="mt-3.5 space-y-2 text-xs">
                         <label class="block">
@@ -517,6 +630,7 @@
 function collectedDataManager(defaultFieldCode, initialProfilingExpanded) {
     return {
         importOpen: false,
+        standarOpen: false,
         profilingExpanded: Boolean(initialProfilingExpanded),
         imputeFieldCode: defaultFieldCode || '',
         imputePulse: false,
